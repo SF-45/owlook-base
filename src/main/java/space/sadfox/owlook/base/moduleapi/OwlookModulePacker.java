@@ -4,6 +4,7 @@ import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.module.ModuleDescriptor.Provides;
 import java.lang.module.ModuleFinder;
 import java.lang.module.ModuleReference;
 import java.nio.file.Files;
@@ -35,26 +36,42 @@ public class OwlookModulePacker {
 				errStr.append(ref.descriptor().name() + "\n");
 			}
 			throw new PackageException(errStr.toString());
-		} else {
-			ModuleReference ref = modSet.iterator().next();
-			this.owlModulePath = Path.of(ref.location().get());
-			MODILE_INFO.moduleName = ref.descriptor().name();
 		}
+		
+		ModuleReference ref = modSet.iterator().next();
+
+		Provides owlookModuleProvider = null;
+		
+		for (Provides provider : ref.descriptor().provides()) {
+			if (provider.service().equals(OwlookModule.class.getName())) {
+				owlookModuleProvider = provider;
+				break;
+			}
+		}
+		
+		if (owlookModuleProvider == null) {
+			throw new PackageException("This module not provide OwlookModule");
+		}else if (owlookModuleProvider.providers().size() > 1) {
+			throw new PackageException("This module provide more than one (" + owlookModuleProvider.providers().size() + ") OwlookModule\n" + String.join("\n", owlookModuleProvider.providers()));
+		} 
+
+		this.owlModulePath = Path.of(ref.location().get());
+		MODILE_INFO.moduleName = ref.descriptor().name();
+
 	}
 
 	public final void pack(Path outDir) throws IOException {
 		if (!Files.isDirectory(outDir)) {
 			throw new NotDirectoryException(outDir.toString());
 		}
-		
-		Path out = outDir.resolve(MODILE_INFO.moduleName() + ".owlm");
+
+		Path out = outDir.resolve(MODILE_INFO.moduleName() + "-" + MODILE_INFO.version() + ".owlm");
 		try (OutputStream outZip = new BufferedOutputStream(Files.newOutputStream(out))) {
 			pack(outZip);
 		}
-		
-		
+
 	}
-	
+
 	public final void pack(OutputStream out) throws IOException {
 		ZipOutputStream zipOut = new ZipOutputStream(out);
 		zipOut.putNextEntry(new ZipEntry("META-INF/"));
@@ -68,20 +85,20 @@ public class OwlookModulePacker {
 		} catch (JAXBException e) {
 			throw new IOException(e);
 		}
-		
+
 		zipOut.putNextEntry(new ZipEntry("main.jar"));
 		try (InputStream in = Files.newInputStream(owlModulePath)) {
 			in.transferTo(zipOut);
 		}
 		zipOut.putNextEntry(new ZipEntry("lib/"));
-		
+
 		for (Path libPath : INCLUDE_LIBRARIES) {
 			zipOut.putNextEntry(new ZipEntry("lib/" + libPath.getFileName()));
 			try (InputStream in = Files.newInputStream(libPath)) {
 				in.transferTo(zipOut);
 			}
 		}
-		
+
 		zipOut.finish();
 	}
 
