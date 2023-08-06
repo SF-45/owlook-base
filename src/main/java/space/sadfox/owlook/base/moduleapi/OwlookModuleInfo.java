@@ -51,7 +51,8 @@ public class OwlookModuleInfo {
 	@XmlElement
 	String description;
 	@XmlElement
-	String version;
+	@XmlJavaTypeAdapter(VersionFormatAdapter.class)
+	VersionFormat version;
 
 	@XmlElement(name = "requiresOwlookModules")
 	@XmlJavaTypeAdapter(RequireOwlookModuleAdapter.class)
@@ -61,7 +62,7 @@ public class OwlookModuleInfo {
 
 	}
 
-	public OwlookModuleInfo(String name, String description, String version, String ... requiresOwlookModules) {
+	public OwlookModuleInfo(String name, String description, VersionFormat version, String ... requiresOwlookModules) {
 		this.name = name;
 		this.description = description;
 		this.version = version;
@@ -76,7 +77,7 @@ public class OwlookModuleInfo {
 		return description;
 	}
 
-	public String version() {
+	public VersionFormat version() {
 		return version;
 	}
 
