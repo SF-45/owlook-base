@@ -20,18 +20,19 @@ public class OwlookModulePack implements AutoCloseable {
 	public final Path LOCATION;
 	public final OwlookModuleInfo MODILE_INFO;
 	public final Path ROOT;
-	public final Path LIB_PATH;
-	public final Path MODULE_PATH;
+	public final Path LIB;
+	public final Path MODULE;
+	private boolean opened = true;
 
 	public OwlookModulePack(Path packPath) throws IOException {
-		LOCATION = packPath;
+		LOCATION = packPath.toAbsolutePath();
 
 		URI uri = URI.create("jar:file:" + LOCATION);
 		packFileSystem = FileSystems.newFileSystem(uri, new HashMap<>());
 		
 		ROOT = packFileSystem.getPath("/");
-		LIB_PATH = ROOT.resolve("lib/");
-		MODULE_PATH = ROOT.resolve("main.jar");
+		LIB = ROOT.resolve("lib/");
+		MODULE = ROOT.resolve("main.jar");
 		try {
 			JAXBContext context = JAXBContext.newInstance(OwlookModuleInfo.class);
 			Unmarshaller unmarshaller = context.createUnmarshaller();
@@ -44,10 +45,15 @@ public class OwlookModulePack implements AutoCloseable {
 		}
 
 	}
+	
+	public boolean isOpened() {
+		return opened;
+	}
 
 	@Override
 	public void close() throws IOException {
 		packFileSystem.close();
+		opened = false;
 
 	}
 

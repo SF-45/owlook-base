@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>space.sadfox</groupId>
   <artifactId>owlook.base</artifactId>
-  <version>0.5.0</version>
+  <version>0.5.1</version>
   <name>Owlook Base</name>
   <description>Base library for Owlook</description>
   <properties>
