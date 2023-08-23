@@ -1,5 +1,7 @@
 package space.sadfox.owlook.base.jaxb;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Stack;
 
 import javafx.beans.property.BooleanProperty;
@@ -11,16 +13,18 @@ import javafx.collections.ObservableList;
 import javafx.collections.ObservableMap;
 import javafx.collections.ObservableSet;
 import javafx.collections.SetChangeListener;
-import space.sadfox.owlook.base.jaxb.EntityChangeListener.Change;
+import space.sadfox.owlook.base.jaxb.ChangeHistoryListener.Change;
 
-public class ChangeHistory {
+public class ChangeHistory<E extends ChangeHistoryKeeping> {
 
-	private final JAXBEntity parent;
+	private final E parent;
 	private final Stack<Changer> back = new Stack<>();
 	private final Stack<Changer> forward = new Stack<>();
 	private final BooleanProperty dontlisen = new SimpleBooleanProperty(false);
 	
-	public ChangeHistory(JAXBEntity parent) {
+	private final List<ChangeHistoryListener<E>> listeners = new ArrayList<>();
+	
+	public ChangeHistory(E parent) {
 		this.parent = parent;
 		register(parent);
 	}
@@ -46,7 +50,7 @@ public class ChangeHistory {
 				}
 			});
 			forward.clear();
-			notifyListeners();
+			notifyWasModify();
 
 		});
 	}
@@ -100,7 +104,7 @@ public class ChangeHistory {
 				}
 			}
 			forward.clear();
-			notifyListeners();
+			notifyWasModify();
 		});
 	}
 
@@ -152,7 +156,7 @@ public class ChangeHistory {
 				});
 			}
 			forward.clear();
-			notifyListeners();
+			notifyWasModify();
 		});
 	}
 
@@ -199,7 +203,7 @@ public class ChangeHistory {
 				});
 			}
 			forward.clear();
-			notifyListeners();
+			notifyWasModify();
 		});
 	}
 
@@ -231,7 +235,29 @@ public class ChangeHistory {
 		changer.undo();
 		dontlisen.set(false);
 		forward.push(changer);
-		notifyListeners();
+		notifyListeners(new Change<E>() {
+
+			@Override
+			public boolean wasModify() {
+				return false;
+			}
+
+			@Override
+			public boolean wasUndo() {
+				return true;
+			}
+
+			@Override
+			public boolean wasRedo() {
+				return false;
+			}
+
+			@Override
+			public E getParent() {
+				return parent;
+			}
+
+		} );
 	}
 
 	public void allBack() {
@@ -252,7 +278,29 @@ public class ChangeHistory {
 		changer.todo();
 		dontlisen.set(false);
 		back.push(changer);
-		notifyListeners();
+		notifyListeners(new Change<E>() {
+
+			@Override
+			public boolean wasModify() {
+				return false;
+			}
+
+			@Override
+			public boolean wasUndo() {
+				return false;
+			}
+
+			@Override
+			public boolean wasRedo() {
+				return true;
+			}
+
+			@Override
+			public E getParent() {
+				return parent;
+			}
+
+		});
 	}
 
 	public void allForward() {
@@ -269,24 +317,42 @@ public class ChangeHistory {
 		back.clear();
 		forward.clear();
 	}
+	
+	public void addListener(ChangeHistoryListener<E> listener) {
+		listeners.add(listener);
+	}
+	
+	public void removeListener(ChangeHistoryListener<E> listener) {
+		listeners.remove(listener);
+	}
 
-	private void notifyListeners() {
-		parent.notifyEntityChangeListeners(new Change() {
-			
-			@Override
-			public boolean wasRemoved() {
-				return false;
-			}
-			
+	private void notifyListeners(ChangeHistoryListener.Change<E> change) {
+		listeners.forEach(listener -> listener.change(change));
+	}
+	
+	private void notifyWasModify() {
+		notifyListeners(new Change<E>() {
+
 			@Override
 			public boolean wasModify() {
 				return true;
 			}
 
 			@Override
-			public JAXBEntity getEntity() {
+			public boolean wasUndo() {
+				return false;
+			}
+
+			@Override
+			public boolean wasRedo() {
+				return false;
+			}
+
+			@Override
+			public E getParent() {
 				return parent;
 			}
+
 		});
 	}
 
