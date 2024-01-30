@@ -19,7 +19,6 @@ import java.util.zip.ZipOutputStream;
 import jakarta.xml.bind.JAXBContext;
 import jakarta.xml.bind.JAXBException;
 import jakarta.xml.bind.Marshaller;
-import space.sadfox.owlook.base.Extensions;
 
 public class OwlookModulePacker {
 
@@ -66,7 +65,7 @@ public class OwlookModulePacker {
 			throw new NotDirectoryException(outDir.toString());
 		}
 
-		Path out = outDir.resolve(MODILE_INFO.moduleName() + "-" + MODILE_INFO.version() + Extensions.OWLOOK_MODULE_PACK);
+		Path out = outDir.resolve(MODILE_INFO.moduleName() + "-" + MODILE_INFO.version() + OwlookModulePack.EXTENSION);
 		try (OutputStream outZip = new BufferedOutputStream(Files.newOutputStream(out))) {
 			pack(outZip);
 		}

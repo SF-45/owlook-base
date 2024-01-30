@@ -1,7 +1,10 @@
 package space.sadfox.owlook.base.owl;
 
-import static space.sadfox.owlook.base.owl.DirectoryStructure.*;
-
+import static space.sadfox.owlook.base.owl.DirectoryStructure.ENTITY_FILE;
+import static space.sadfox.owlook.base.owl.DirectoryStructure.HEAD_FILE;
+import static space.sadfox.owlook.base.owl.DirectoryStructure.INFO_DIR;
+import static space.sadfox.owlook.base.owl.DirectoryStructure.INFO_FILE;
+import static space.sadfox.owlook.base.owl.DirectoryStructure.RESOURCES_DIR;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.FileNotFoundException;
@@ -14,229 +17,227 @@ import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
-
 import jakarta.xml.bind.JAXBException;
-import javafx.beans.property.BooleanProperty;
-import javafx.beans.property.ReadOnlyBooleanProperty;
-import javafx.beans.property.SimpleBooleanProperty;
-import space.sadfox.owlook.base.Extensions;
-import space.sadfox.owlook.base.jaxb.JAXBHelper2;
+import space.sadfox.owlook.base.jaxb.JAXBHelper;
 
-public class Owl<T extends OwlEntity> implements AutoCloseable {
+public final class Owl<T extends OwlEntity> implements AutoCloseable, HollowOwl {
 
-	private final FileSystem owlFileSystem;
-	private final BooleanProperty openedProperty = new SimpleBooleanProperty(true);
+  public static final String EXTENSION = ".owl";
 
-	private final Path location;
-	private final OwlInfo info;
-	private final OwlHead<T> head;
+  private final FileSystem owlFileSystem;
 
-	private Class<T> target;
-	private T entity;
+  private final Path location;
+  private final OwlInfo info;
+  private final OwlHead head;
 
-	private final Path root;
-	private final Path resources;
-	private final Path entityPath;
-	private final Path headPath;
+  private Class<T> target;
+  private T entity;
 
-	private SaveExceptionHandler saveExceptionHandler;
+  private final Path root;
+  private final Path resources;
+  private final Path entityPath;
+  private final Path headPath;
 
-	public Owl(Path owlFile, Class<T> target) throws IOException, JAXBException, OwlEntityInitializeException {
-		this(owlFile);
-		this.target = target;
+  private SaveExceptionHandler saveExceptionHandler;
 
-		try (InputStream in = Files.newInputStream(entityPath)) {
-			entity = JAXBHelper2.unmarshalInstance(in, target);
-		}
-		entity.initialize();
-		entity.setOwl(this);
-		entity.getChangeHistory().addListener(change -> {
-			if (isEnableAutoSave()) {
-				try {
-					save();
-				} catch (Exception e) {
-					saveExceptionHandler.handle(e);
-				}
-			}
-		});
-	}
+  public Owl(Path owlFile, Class<T> target)
+      throws IOException, JAXBException, OwlEntityInitializeException {
+    this(owlFile);
+    this.target = target;
 
-	private Owl(Path owlFile) throws IOException, JAXBException {
-		if (Files.notExists(owlFile)) {
-			throw new FileNotFoundException(owlFile.toString());
-		}
+    entity = JAXBHelper.unmarshalInstance(entityPath, target);
+    entity.initialize();
+    entity.setOwl(this);
+    entity.getChangeHistory().addListener(change -> autoSaveAction());
+  }
 
-		location = owlFile.toAbsolutePath();
+  private Owl(Path owlFile) throws IOException, JAXBException {
+    if (Files.notExists(owlFile)) {
+      throw new FileNotFoundException(owlFile.toString());
+    }
 
-		URI uri = URI.create("jar:file:" + location);
-		owlFileSystem = FileSystems.newFileSystem(uri, new HashMap<>());
+    location = owlFile.toAbsolutePath();
 
-		root = owlFileSystem.getPath("/");
-		resources = root.resolve(RESOURCES_DIR.get());
-		entityPath = root.resolve(ENTITY_FILE.get());
-		headPath = root.resolve(HEAD_FILE.get());
+    Map<String, String> env = new HashMap<>();
+    env.put("create", "true");
+    URI uri = URI.create("jar:file:" + location);
+    owlFileSystem = FileSystems.newFileSystem(uri, env);
 
-		Path infoFile = root.resolve(INFO_FILE.get());
-		try (InputStream in = Files.newInputStream(infoFile)) {
-			info = JAXBHelper2.unmarshalInstance(in, OwlInfo.class);
-		}
+    root = owlFileSystem.getPath("/");
+    resources = root.resolve(RESOURCES_DIR.get());
+    entityPath = root.resolve(ENTITY_FILE.get());
+    headPath = root.resolve(HEAD_FILE.get());
 
-		try (InputStream in = Files.newInputStream(headPath)) {
-			head = JAXBHelper2.unmarshalInstance(in, OwlHead.class);
-		}
-		head.setOwl(this);
-		head.getChangeHistory().addListener(change -> {
-			if (isEnableAutoSave()) {
-				try {
-					save();
-				} catch (Exception e) {
-					saveExceptionHandler.handle(e);
-				}
-			}
-		});
+    Path infoFile = root.resolve(INFO_FILE.get());
+    info = JAXBHelper.unmarshalInstance(infoFile, OwlInfo.class);
+    head = JAXBHelper.unmarshalInstance(headPath, OwlHead.class);
+    head.setHollowOwl(this);
+    head.getChangeHistory().addListener(change -> autoSaveAction());
 
-	}
+  }
 
-	public T entity() {
-		return entity;
-	}
+  public T entity() {
+    return entity;
+  }
 
-	public Class<T> entityClass() {
-		return target;
-	}
+  public Class<T> entityClass() {
+    return target;
+  }
 
-	public OwlInfo info() {
-		return info;
-	}
+  @Override
+  public OwlInfo info() {
+    return info;
+  }
 
-	public OwlHead<T> head() {
-		return head;
-	}
+  @Override
+  public OwlHead head() {
+    return head;
+  }
 
-	public boolean isOpened() {
-		return openedProperty.get();
-	}
-	
-	public ReadOnlyBooleanProperty openedProperty() {
-		return openedProperty;
-	}
+  public boolean isOpened() {
+    return owlFileSystem.isOpen();
+  }
 
-	public Path location() {
-		return location;
-	}
+  @Override
+  public Path location() {
+    return location;
+  }
 
-	public String fileName() {
-		String fileName = location.getFileName().toString();
-		int ind = fileName.indexOf(Extensions.OWL.get());
-		return fileName.substring(0, ind);
-	}
-	
-	public Path resourcePath(String resourceName) {
-		return resources.resolve(resourceName);
-	}
+  public String fileName() {
+    String fileName = location.getFileName().toString();
+    int ind = fileName.indexOf(EXTENSION);
+    return fileName.substring(0, ind);
+  }
 
-	public InputStream resourceInputStream(String resourceName) throws IOException {
-		return Files.newInputStream(resources.resolve(resourceName));
-	}
+  public Path resourcePath(String resourceName) {
+    return resources.resolve(resourceName);
+  }
 
-	public BufferedInputStream resourceBufferedInputStream(String resourceName) throws IOException {
-		return new BufferedInputStream(resourceInputStream(resourceName));
-	}
+  public InputStream resourceInputStream(String resourceName) throws IOException {
+    return Files.newInputStream(resources.resolve(resourceName));
+  }
 
-	public OutputStream resourceOutputStream(String resourceName) throws IOException {
-		return Files.newOutputStream(resources.resolve(resourceName));
-	}
+  public BufferedInputStream resourceBufferedInputStream(String resourceName) throws IOException {
+    return new BufferedInputStream(resourceInputStream(resourceName));
+  }
 
-	public BufferedOutputStream resourceBufferedOutputStream(String resourceName) throws IOException {
-		return new BufferedOutputStream(resourceOutputStream(resourceName));
-	}
+  public OutputStream resourceOutputStream(String resourceName) throws IOException {
+    return Files.newOutputStream(resources.resolve(resourceName));
+  }
 
-	public void save() throws JAXBException, IOException {
-		JAXBHelper2.marshalInstance(entityPath, target, entity);
-		JAXBHelper2.marshalInstance(headPath, OwlHead.class, head);
-	}
+  public BufferedOutputStream resourceBufferedOutputStream(String resourceName) throws IOException {
+    return new BufferedOutputStream(resourceOutputStream(resourceName));
+  }
 
-	public void enableAutoSave(SaveExceptionHandler handler) {
-		saveExceptionHandler = handler;
-	}
+  public void save() throws JAXBException, IOException {
+    if (!isOpened())
+      return;
+    System.out.println(new Date(System.currentTimeMillis()));
+    JAXBHelper.marshalInstance(entityPath, target, entity);
+    JAXBHelper.marshalInstance(headPath, OwlHead.class, head);
+  }
 
-	public void disableAutoSave() {
-		saveExceptionHandler = null;
-	}
+  private void autoSaveAction() {
+    if (isEnableAutoSave()) {
+      try {
+        save();
+      } catch (Exception e) {
+        saveExceptionHandler.handle(e);
+      }
+    }
+  }
 
-	public boolean isEnableAutoSave() {
-		return saveExceptionHandler != null;
-	}
+  public void enableAutoSave(SaveExceptionHandler handler) {
+    saveExceptionHandler = handler;
+  }
 
-	@Override
-	public void close() throws IOException {
-		if (owlFileSystem != null) {
-			owlFileSystem.close();
-		}
-		openedProperty.set(false);
-	}
+  public void disableAutoSave() {
+    saveExceptionHandler = null;
+  }
 
-	/**
-	 * 
-	 * @param <T>
-	 * @param directory
-	 * @param name
-	 * @param target
-	 * @return
-	 * @throws FileAlreadyExistsException
-	 * @throws IOException
-	 * @throws JAXBException
-	 * @throws ReflectiveOperationException
-	 */
-	public static <T extends OwlEntity> Owl<T> create(Path directory, String name, Class<T> target) throws Exception {
-		if (!Files.isDirectory(directory)) {
-			throw new IOException("Is not directory: " + directory);
-		}
+  public boolean isEnableAutoSave() {
+    return saveExceptionHandler != null;
+  }
 
-		Path newOwlFile = directory.resolve(name + Extensions.OWL.get());
+  @Override
+  public void close() throws IOException {
+    if (owlFileSystem != null) {
+      owlFileSystem.close();
+    }
+  }
 
-		if (Files.exists(newOwlFile)) {
-			throw new FileAlreadyExistsException(name + Extensions.OWL.get());
-		}
+  /**
+   * 
+   * @param <T>
+   * @param directory
+   * @param name
+   * @param target
+   * @return
+   * @throws FileAlreadyExistsException
+   * @throws IOException
+   * @throws JAXBException
+   * @throws ReflectiveOperationException
+   */
+  public static <T extends OwlEntity> Owl<T> create(Path directory, String name, Class<T> target)
+      throws Exception {
+    if (!Files.isDirectory(directory)) {
+      throw new IOException("Is not directory: " + directory);
+    }
 
-		try (ZipOutputStream zipOut = new ZipOutputStream(Files.newOutputStream(newOwlFile))) {
-			zipOut.putNextEntry(new ZipEntry(INFO_DIR.get()));
-			zipOut.putNextEntry(new ZipEntry(INFO_FILE.get()));
-			OwlInfo info = new OwlInfo();
-			info.createdModule = target.getModule().getName();
-			info.createdTime = System.currentTimeMillis();
-			info.targetClass = target.getName();
-			JAXBHelper2.marshalInstance(zipOut, OwlInfo.class, info);
+    Path newOwlFile = directory.resolve(name + EXTENSION);
 
-			zipOut.putNextEntry(new ZipEntry(RESOURCES_DIR.get()));
+    if (Files.exists(newOwlFile)) {
+      throw new FileAlreadyExistsException(name + EXTENSION);
+    }
 
-			zipOut.putNextEntry(new ZipEntry(HEAD_FILE.get()));
-			OwlHead<T> head = new OwlHead<>();
-			JAXBHelper2.marshalInstance(zipOut, OwlHead.class, head);
+    T entity = target.getConstructor().newInstance();
+    OwlInfo info = new OwlInfo();
+    info.createdModule = target.getModule().getName();
+    info.createdTime = System.currentTimeMillis();
+    info.targetClass = target.getName();
+    info.owlName = entity.getEntityName();
 
-			zipOut.putNextEntry(new ZipEntry(ENTITY_FILE.get()));
-			T entity = target.getConstructor().newInstance();
-			JAXBHelper2.marshalInstance(zipOut, target, entity);
+    try (ZipOutputStream zipOut = new ZipOutputStream(Files.newOutputStream(newOwlFile))) {
+      zipOut.putNextEntry(new ZipEntry(INFO_DIR.get()));
 
-		} catch (Exception e) {
-			Files.deleteIfExists(newOwlFile);
-			throw e;
-		}
+      zipOut.putNextEntry(new ZipEntry(INFO_FILE.get()));
+      JAXBHelper.marshalInstance(zipOut, OwlInfo.class, info);
 
-		return new Owl<>(newOwlFile, target);
-	}
+      zipOut.putNextEntry(new ZipEntry(RESOURCES_DIR.get()));
 
-	public static OwlInfo extractInfo(Path owlFile) throws IOException, JAXBException {
-		try (Owl<OwlEntity> owl = new Owl<>(owlFile)) {
-			return owl.info();
-		}
-	}
+      zipOut.putNextEntry(new ZipEntry(HEAD_FILE.get()));
+      JAXBHelper.marshalInstance(zipOut, OwlHead.class, new OwlHead());
 
-	@FunctionalInterface
-	public interface SaveExceptionHandler {
-		void handle(Exception exception);
-	}
+      zipOut.putNextEntry(new ZipEntry(ENTITY_FILE.get()));
+      JAXBHelper.marshalInstance(zipOut, target, entity);
+
+    } catch (Exception e) {
+      Files.deleteIfExists(newOwlFile);
+      throw e;
+    }
+
+    return new Owl<>(newOwlFile, target);
+  }
+
+  public static HollowOwl getHollowOwl(Path owlFile) throws IOException, JAXBException {
+    try (Owl<OwlEntity> owl = new Owl<>(owlFile)) {
+      return owl;
+    }
+  }
+
+  public HollowOwl getHollowOwl() {
+    return this;
+  }
+
+  @FunctionalInterface
+  public interface SaveExceptionHandler {
+    void handle(Exception exception);
+  }
+
+
 }

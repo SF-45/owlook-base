@@ -11,7 +11,7 @@ import jakarta.xml.bind.JAXBException;
 import jakarta.xml.bind.Marshaller;
 import jakarta.xml.bind.Unmarshaller;
 
-public class JAXBHelper2 {
+public class JAXBHelper {
 	
 	public static <T, E extends T> void marshalInstance(OutputStream outputStream, Class<E> target, T instance) throws JAXBException {
 		Marshaller marshaller = JAXBContext.newInstance(target).createMarshaller();

@@ -14,12 +14,12 @@ import space.sadfox.owlook.base.jaxb.ChangeHistoryKeeping;
 
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.NONE)
-public class OwlHead<T extends OwlEntity> implements ChangeHistoryKeeping {
+public class OwlHead implements ChangeHistoryKeeping {
 	
-	private final ChangeHistory<OwlHead<T>> changeHistory;
-	private Owl<T> owl;
+	private final ChangeHistory<OwlHead> changeHistory;
+	private HollowOwl hollowOwl;
 	
-	private final StringProperty title = new SimpleStringProperty("title");
+	private final StringProperty title = new SimpleStringProperty();
 	
 	public OwlHead() {
 		changeHistory = new ChangeHistory<>(this);
@@ -39,21 +39,34 @@ public class OwlHead<T extends OwlEntity> implements ChangeHistoryKeeping {
 	}
 
 
-	public ChangeHistory<OwlHead<T>> getChangeHistory() {
+	public ChangeHistory<OwlHead> getChangeHistory() {
 		return changeHistory;
 	}
 	
-	public Owl<T> getOwl() {
-		return owl;
+	public HollowOwl getHollowOwl() {
+		return hollowOwl;
 	}
 	
-	void setOwl(Owl<T> owl) {
-		this.owl = owl;
+	void setHollowOwl(HollowOwl hollowOwl) {
+		this.hollowOwl = hollowOwl;
 	}
 
 	@Override
 	public List<Object> getProperties() {
 		return Arrays.asList(title);
 	};
+	
+	public void syncWith(OwlHead owlHead) {
+		//TODO:
+	}
+
+	@Override
+	public String toString() {
+		return "OwlHead [getTitle()=" + getTitle() + "]";
+	}
+
+	
+	
+	
 	
 }

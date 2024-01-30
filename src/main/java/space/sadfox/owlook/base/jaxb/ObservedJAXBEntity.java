@@ -1,8 +1,9 @@
 package space.sadfox.owlook.base.jaxb;
 
+import java.util.Date;
 import java.util.List;
 
-public abstract class ObservedJAXBEntity extends JAXBEntity2 implements ChangeHistoryKeeping {
+public abstract class ObservedJAXBEntity extends JAXBEntity implements ChangeHistoryKeeping {
 	
 	@FunctionalInterface
 	public interface SaveExceptionHandler {
@@ -10,22 +11,9 @@ public abstract class ObservedJAXBEntity extends JAXBEntity2 implements ChangeHi
 	}
 	
 	private ChangeHistory<ObservedJAXBEntity> changeHistory;
-	private final ChangeHistoryListener<ObservedJAXBEntity> autosaveAction;
+	private ChangeHistoryListener<ObservedJAXBEntity> autosaveAction;
 
 	private SaveExceptionHandler saveExceptionHandler;
-	
-	public ObservedJAXBEntity() {
-		changeHistory = new ChangeHistory<>(this);
-		autosaveAction = change -> {
-			if (saveExceptionHandler != null) {
-				try {
-					save();
-				} catch (Exception e) {
-					saveExceptionHandler.handle(e);
-				}
-			}
-		};
-	}
 
 	public abstract List<Object> getProperties();
 	
@@ -44,6 +32,22 @@ public abstract class ObservedJAXBEntity extends JAXBEntity2 implements ChangeHi
 	}
 	
 	public ChangeHistory<ObservedJAXBEntity> getChangeHistory() {
-		return changeHistory;
+		return changeHistory; 
 	}
+
+	@Override
+	protected void initialization() {
+		changeHistory = new ChangeHistory<>(this);
+		autosaveAction = change -> {
+			if (saveExceptionHandler != null) {
+				try {
+					save();
+				} catch (Exception e) {
+					saveExceptionHandler.handle(e);
+				}
+			}
+		};
+	}
+	
+	
 }

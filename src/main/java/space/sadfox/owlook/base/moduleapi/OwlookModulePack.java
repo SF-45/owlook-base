@@ -14,6 +14,8 @@ import jakarta.xml.bind.JAXBException;
 import jakarta.xml.bind.Unmarshaller;
 
 public class OwlookModulePack implements AutoCloseable {
+	public static final String EXTENSION = ".owlm";
+	
 	private final FileSystem packFileSystem;
 	
 	

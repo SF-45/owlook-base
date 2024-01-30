@@ -13,7 +13,7 @@ import java.util.stream.Collectors;
 
 public class OwlookModulePacks {
 	public static List<Path> findModuleFiles(Path parent, int deep) throws IOException {
-		return Files.find(parent, deep, (p, attr) -> p.getFileName().toString().endsWith(".owlm"))
+		return Files.find(parent, deep, (p, attr) -> p.getFileName().toString().endsWith(OwlookModulePack.EXTENSION))
 				.map(Path::toAbsolutePath).collect(Collectors.toList());
 	}
 	public static List<OwlookModulePack> getModulePacks(Path... moduleFiles) {

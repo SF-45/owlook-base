@@ -7,17 +7,17 @@ import java.nio.file.Path;
 
 import jakarta.xml.bind.JAXBException;
 
-public abstract class JAXBEntity2 {
+public abstract class JAXBEntity {
 	
 	private Path location;
 	
 	public void save(OutputStream outputStream) throws JAXBException {
-		JAXBHelper2.marshalInstance(outputStream, this.getClass(), this);
+		JAXBHelper.marshalInstance(outputStream, this.getClass(), this);
 	}
 	
 	public void save() throws JAXBException, UnlocatedEntityException, IOException {
 		try (OutputStream out = Files.newOutputStream(getLocation())) {
-			JAXBHelper2.marshalInstance(out, this.getClass(), this);
+			JAXBHelper.marshalInstance(out, this.getClass(), this);
 		}
 	}
 	
@@ -31,4 +31,6 @@ public abstract class JAXBEntity2 {
 	void setLocation(Path location) {
 		this.location = location;
 	}
+	
+	protected abstract void initialization();
 }

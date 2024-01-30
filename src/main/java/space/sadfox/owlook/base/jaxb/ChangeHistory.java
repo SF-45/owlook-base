@@ -81,7 +81,8 @@ public class ChangeHistory<E extends ChangeHistoryKeeping> {
 
 							@Override
 							public void todo() {
-								observableList.add(element);
+								int ind = observableList.indexOf(element);
+								observableList.add(ind, element);
 							}
 						});
 					});
@@ -92,7 +93,8 @@ public class ChangeHistory<E extends ChangeHistoryKeeping> {
 
 							@Override
 							public void undo() {
-								observableList.add(element);
+								int ind = observableList.indexOf(element);
+								observableList.add(ind, element);
 							}
 
 							@Override

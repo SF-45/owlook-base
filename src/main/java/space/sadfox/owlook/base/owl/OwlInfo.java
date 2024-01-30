@@ -14,6 +14,8 @@ public class OwlInfo {
 	Long createdTime;
 	@XmlElement
 	String targetClass;
+	@XmlElement
+	String owlName;
 	
 	OwlInfo() {
 	}
@@ -28,5 +30,9 @@ public class OwlInfo {
 	
 	public String targetClass() {
 		return targetClass;
+	}
+	
+	public String owlName() {
+		return owlName;
 	}
 }

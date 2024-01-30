@@ -7,7 +7,7 @@ import space.sadfox.owlook.base.jaxb.ChangeHistoryKeeping;
 
 public abstract class OwlEntity implements ChangeHistoryKeeping {
 	private final ChangeHistory<OwlEntity> changeHistory;
-	private Owl<? extends OwlEntity> owl;
+	private Owl<?> owl;
 	
 	public OwlEntity() {
 		changeHistory = new ChangeHistory<>(this);
@@ -17,16 +17,20 @@ public abstract class OwlEntity implements ChangeHistoryKeeping {
 		return changeHistory;
 	}
 	
-	public final Owl<? extends OwlEntity> getOwl() {
+	public final Owl<?> getOwl() {
 		return owl;
 	}
 	
-	final void  setOwl(Owl<? extends OwlEntity> owl) {
+	final void  setOwl(Owl<?> owl) {
 		this.owl = owl;
 	}
-
+	
 	@Override
 	public abstract List<Object> getProperties();
+	
+	public String getEntityName() {
+		return getClass().getSimpleName();
+	}
 	
 	protected abstract void initialize() throws OwlEntityInitializeException;
 	public abstract void syncWith(OwlEntity entity);
