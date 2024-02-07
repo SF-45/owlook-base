@@ -25,7 +25,7 @@ import java.util.zip.ZipOutputStream;
 import jakarta.xml.bind.JAXBException;
 import space.sadfox.owlook.base.jaxb.JAXBHelper;
 
-public final class Owl<T extends OwlEntity> implements AutoCloseable, HollowOwl {
+public final class Owl<T extends OwlEntity> implements HollowOwl {
 
   public static final String EXTENSION = ".owl";
 
@@ -171,22 +171,20 @@ public final class Owl<T extends OwlEntity> implements AutoCloseable, HollowOwl 
     }
   }
 
-  /**
-   * 
-   * @param <T>
-   * @param directory
-   * @param name
-   * @param target
-   * @return
-   * @throws FileAlreadyExistsException
-   * @throws IOException
-   * @throws JAXBException
-   * @throws ReflectiveOperationException
-   */
   public static <T extends OwlEntity> Owl<T> create(Path directory, String name, Class<T> target)
-      throws Exception {
+      throws IOException, JAXBException, ReflectiveOperationException,
+      OwlEntityInitializeException {
     if (!Files.isDirectory(directory)) {
       throw new IOException("Is not directory: " + directory);
+    }
+    OwlInfo info = new OwlInfo();
+    T entity = target.getConstructor().newInstance();
+    info.createdModule = target.getModule().getName();
+    info.createdTime = System.currentTimeMillis();
+    info.targetClass = target.getName();
+    info.owlName = entity.getEntityName();
+    if (name == null || name == "") {
+      name = info.id().toString();
     }
 
     Path newOwlFile = directory.resolve(name + EXTENSION);
@@ -194,13 +192,6 @@ public final class Owl<T extends OwlEntity> implements AutoCloseable, HollowOwl 
     if (Files.exists(newOwlFile)) {
       throw new FileAlreadyExistsException(name + EXTENSION);
     }
-
-    T entity = target.getConstructor().newInstance();
-    OwlInfo info = new OwlInfo();
-    info.createdModule = target.getModule().getName();
-    info.createdTime = System.currentTimeMillis();
-    info.targetClass = target.getName();
-    info.owlName = entity.getEntityName();
 
     try (ZipOutputStream zipOut = new ZipOutputStream(Files.newOutputStream(newOwlFile))) {
       zipOut.putNextEntry(new ZipEntry(INFO_DIR.get()));
@@ -222,6 +213,12 @@ public final class Owl<T extends OwlEntity> implements AutoCloseable, HollowOwl 
     }
 
     return new Owl<>(newOwlFile, target);
+  }
+
+  public static <T extends OwlEntity> Owl<T> create(Path directory, Class<T> target)
+      throws IOException, JAXBException, ReflectiveOperationException,
+      OwlEntityInitializeException {
+    return create(directory, null, target);
   }
 
   public static HollowOwl getHollowOwl(Path owlFile) throws IOException, JAXBException {
