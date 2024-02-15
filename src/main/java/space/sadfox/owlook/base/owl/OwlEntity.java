@@ -5,14 +5,13 @@ import space.sadfox.owlook.base.jaxb.ChangeHistory;
 import space.sadfox.owlook.base.jaxb.ChangeHistoryKeeping;
 
 public abstract class OwlEntity implements ChangeHistoryKeeping {
-  private final ChangeHistory<OwlEntity> changeHistory;
+  private ChangeHistory<OwlEntity> changeHistory;
   private Owl<?> owl;
 
-  public OwlEntity() {
-    changeHistory = new ChangeHistory<>(this);
-  }
-
   public final ChangeHistory<OwlEntity> getChangeHistory() {
+    if (changeHistory == null) {
+      changeHistory = new ChangeHistory<>(this);
+    }
     return changeHistory;
   }
 
