@@ -222,8 +222,14 @@ public final class Owl<T extends OwlEntity> implements HollowOwl {
   }
 
   public static HollowOwl getHollowOwl(Path owlFile) throws IOException, JAXBException {
-    try (Owl<OwlEntity> owl = new Owl<>(owlFile)) {
+    Owl<OwlEntity> owl = null;
+    try {
+      owl = new Owl<>(owlFile);
       return owl;
+    } finally {
+      if (owl != null) {
+        owl.close();
+      }
     }
   }
 
