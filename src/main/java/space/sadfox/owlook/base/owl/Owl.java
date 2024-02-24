@@ -27,6 +27,39 @@ import space.sadfox.owlook.base.jaxb.JAXBHelper;
 
 public final class Owl<T extends OwlEntity> implements HollowOwl {
 
+  private class AutoSaveTimer implements Runnable {
+    private int duration = 0;
+    private int counter = 1;
+    public final Thread thread;
+
+    AutoSaveTimer(int durationSec) {
+      duration = durationSec;
+      thread = new Thread(this);
+      thread.start();
+    }
+
+    @Override
+    public void run() {
+      while (counter < duration) {
+        counter++;
+        try {
+          Thread.sleep(1000);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+      }
+      try {
+        save();
+      } catch (JAXBException | IOException e) {
+        saveExceptionHandler.handle(e);
+      }
+    }
+
+    public void resetTimer() {
+      counter = 1;
+    }
+  }
+
   public static final String EXTENSION = ".owl";
 
   private final FileSystem owlFileSystem;
@@ -44,6 +77,8 @@ public final class Owl<T extends OwlEntity> implements HollowOwl {
   private final Path headPath;
 
   private SaveExceptionHandler saveExceptionHandler;
+  private int autoSaveDelay = 0;
+  private AutoSaveTimer autoSaveTimer;
 
   public Owl(Path owlFile, Class<T> target)
       throws IOException, JAXBException, OwlEntityInitializeException {
@@ -134,7 +169,7 @@ public final class Owl<T extends OwlEntity> implements HollowOwl {
     return new BufferedOutputStream(resourceOutputStream(resourceName));
   }
 
-  public void save() throws JAXBException, IOException {
+  public synchronized void save() throws JAXBException, IOException {
     if (!isOpened())
       return;
     System.out.println(new Date(System.currentTimeMillis()));
@@ -144,12 +179,16 @@ public final class Owl<T extends OwlEntity> implements HollowOwl {
 
   private void autoSaveAction() {
     if (isEnableAutoSave()) {
-      try {
-        save();
-      } catch (Exception e) {
-        saveExceptionHandler.handle(e);
+      if (autoSaveTimer == null || !autoSaveTimer.thread.isAlive()) {
+        autoSaveTimer = new AutoSaveTimer(autoSaveDelay);
+      } else {
+        autoSaveTimer.resetTimer();
       }
     }
+  }
+
+  public void setAutoSaveDelay(int sec) {
+    autoSaveDelay = sec;
   }
 
   public void enableAutoSave(SaveExceptionHandler handler) {
