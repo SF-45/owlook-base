@@ -5,21 +5,11 @@ import static space.sadfox.owlook.base.owl.DirectoryStructure.HEAD_FILE;
 import static space.sadfox.owlook.base.owl.DirectoryStructure.INFO_DIR;
 import static space.sadfox.owlook.base.owl.DirectoryStructure.INFO_FILE;
 import static space.sadfox.owlook.base.owl.DirectoryStructure.RESOURCES_DIR;
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.URI;
 import java.nio.file.FileAlreadyExistsException;
-import java.nio.file.FileSystem;
-import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import jakarta.xml.bind.JAXBException;
@@ -62,7 +52,7 @@ public final class Owl<T extends OwlEntity> implements HollowOwl {
 
   public static final String EXTENSION = ".owl";
 
-  private final FileSystem owlFileSystem;
+  private OwlFileSystem fileSystem;
 
   private final Path location;
   private final OwlInfo info;
@@ -71,49 +61,29 @@ public final class Owl<T extends OwlEntity> implements HollowOwl {
   private Class<T> target;
   private T entity;
 
-  private final Path root;
-  private final Path resources;
-  private final Path entityPath;
-  private final Path headPath;
-
   private SaveExceptionHandler saveExceptionHandler;
   private int autoSaveDelay = 0;
   private AutoSaveTimer autoSaveTimer;
 
   public Owl(Path owlFile, Class<T> target)
       throws IOException, JAXBException, OwlEntityInitializeException {
-    this(owlFile);
-    this.target = target;
+    try (OwlFileSystem fileSystem = new OwlFileSystem(owlFile)) {
+      location = fileSystem.location;
+      this.fileSystem = fileSystem;
 
-    entity = JAXBHelper.unmarshalInstance(entityPath, target);
-    entity.initialize();
-    entity.setOwl(this);
-    entity.getChangeHistory().addListener(change -> autoSaveAction());
-  }
+      info = JAXBHelper.unmarshalInstance(fileSystem.infoPath, OwlInfo.class);
+      head = JAXBHelper.unmarshalInstance(fileSystem.headPath, OwlHead.class);
+      head.setHollowOwl(this);
+      head.getChangeHistory().addListener(change -> autoSaveAction());
 
-  private Owl(Path owlFile) throws IOException, JAXBException {
-    if (Files.notExists(owlFile)) {
-      throw new FileNotFoundException(owlFile.toString());
+      if (target != null) {
+        this.target = target;
+        entity = JAXBHelper.unmarshalInstance(fileSystem.entityPath, target);
+        entity.initialize();
+        entity.setOwl(this);
+        entity.getChangeHistory().addListener(change -> autoSaveAction());
+      }
     }
-
-    location = owlFile.toAbsolutePath();
-
-    Map<String, String> env = new HashMap<>();
-    env.put("create", "true");
-    URI uri = URI.create("jar:file:" + location);
-    owlFileSystem = FileSystems.newFileSystem(uri, env);
-
-    root = owlFileSystem.getPath("/");
-    resources = root.resolve(RESOURCES_DIR.get());
-    entityPath = root.resolve(ENTITY_FILE.get());
-    headPath = root.resolve(HEAD_FILE.get());
-
-    Path infoFile = root.resolve(INFO_FILE.get());
-    info = JAXBHelper.unmarshalInstance(infoFile, OwlInfo.class);
-    head = JAXBHelper.unmarshalInstance(headPath, OwlHead.class);
-    head.setHollowOwl(this);
-    head.getChangeHistory().addListener(change -> autoSaveAction());
-
   }
 
   public T entity() {
@@ -134,10 +104,6 @@ public final class Owl<T extends OwlEntity> implements HollowOwl {
     return head;
   }
 
-  public boolean isOpened() {
-    return owlFileSystem.isOpen();
-  }
-
   @Override
   public Path location() {
     return location;
@@ -149,32 +115,18 @@ public final class Owl<T extends OwlEntity> implements HollowOwl {
     return fileName.substring(0, ind);
   }
 
-  public Path resourcePath(String resourceName) {
-    return resources.resolve(resourceName);
-  }
-
-  public InputStream resourceInputStream(String resourceName) throws IOException {
-    return Files.newInputStream(resources.resolve(resourceName));
-  }
-
-  public BufferedInputStream resourceBufferedInputStream(String resourceName) throws IOException {
-    return new BufferedInputStream(resourceInputStream(resourceName));
-  }
-
-  public OutputStream resourceOutputStream(String resourceName) throws IOException {
-    return Files.newOutputStream(resources.resolve(resourceName));
-  }
-
-  public BufferedOutputStream resourceBufferedOutputStream(String resourceName) throws IOException {
-    return new BufferedOutputStream(resourceOutputStream(resourceName));
+  public OwlResource openResource() throws IOException {
+    try (OwlFileSystem fs = getOwlFileSystem()) {
+      return fs.openResource();
+    }
   }
 
   public synchronized void save() throws JAXBException, IOException {
-    if (!isOpened())
-      return;
-    System.out.println(new Date(System.currentTimeMillis()));
-    JAXBHelper.marshalInstance(entityPath, target, entity);
-    JAXBHelper.marshalInstance(headPath, OwlHead.class, head);
+    try (OwlFileSystem fs = getOwlFileSystem()) {
+      System.out.println(new Date(System.currentTimeMillis()));
+      JAXBHelper.marshalInstance(fs.entityPath, target, entity);
+      JAXBHelper.marshalInstance(fs.headPath, OwlHead.class, head);
+    }
   }
 
   private void autoSaveAction() {
@@ -201,13 +153,6 @@ public final class Owl<T extends OwlEntity> implements HollowOwl {
 
   public boolean isEnableAutoSave() {
     return saveExceptionHandler != null;
-  }
-
-  @Override
-  public void close() throws IOException {
-    if (owlFileSystem != null) {
-      owlFileSystem.close();
-    }
   }
 
   public static <T extends OwlEntity> Owl<T> create(Path directory, String name, Class<T> target)
@@ -261,19 +206,25 @@ public final class Owl<T extends OwlEntity> implements HollowOwl {
   }
 
   public static HollowOwl getHollowOwl(Path owlFile) throws IOException, JAXBException {
-    Owl<OwlEntity> owl = null;
+    Owl<?> owl = null;
     try {
-      owl = new Owl<>(owlFile);
-      return owl;
-    } finally {
-      if (owl != null) {
-        owl.close();
-      }
+      owl = new Owl<>(owlFile, null);
+    } catch (OwlEntityInitializeException e) {
+      throw new IOException(e);
     }
+    return owl;
   }
 
   public HollowOwl getHollowOwl() {
     return this;
+  }
+
+  private OwlFileSystem getOwlFileSystem() throws IOException {
+    if (fileSystem.isOpened()) {
+      return fileSystem;
+    } else {
+      return new OwlFileSystem(location);
+    }
   }
 
   @FunctionalInterface

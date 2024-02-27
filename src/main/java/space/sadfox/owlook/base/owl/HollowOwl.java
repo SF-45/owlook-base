@@ -2,7 +2,7 @@ package space.sadfox.owlook.base.owl;
 
 import java.nio.file.Path;
 
-public interface HollowOwl extends AutoCloseable {
+public interface HollowOwl {
   OwlInfo info();
 
   OwlHead head();
