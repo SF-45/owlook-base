@@ -37,7 +37,7 @@ class OwlFileSystem implements AutoCloseable {
 
     Map<String, String> env = new HashMap<>();
     env.put("create", "true");
-    URI uri = URI.create("jar:file:" + location);
+    URI uri = URI.create("jar:" + location.toUri());
     fileSystem = FileSystems.newFileSystem(uri, env);
 
     root = fileSystem.getPath("/");
