@@ -105,6 +105,11 @@ public final class Owl<T extends OwlEntity> implements HollowOwl {
   }
 
   @Override
+  public String toString() {
+    return "Owl{info=" + info + "\nhead=" + head + "}";
+  }
+
+  @Override
   public Path location() {
     return location;
   }

@@ -43,4 +43,10 @@ public class OwlInfo {
   public UUID id() {
     return id;
   }
+
+  @Override
+  public String toString() {
+    return "OwlInfo{createdModule=" + createdModule + ", targetClass=" + targetClass + ", owlName="
+        + owlName + ", id=" + id + "}";
+  }
 }

@@ -2,14 +2,12 @@ package space.sadfox.owlook.base.owl;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.UUID;
 import jakarta.xml.bind.annotation.XmlAccessType;
 import jakarta.xml.bind.annotation.XmlAccessorType;
 import jakarta.xml.bind.annotation.XmlElement;
 import jakarta.xml.bind.annotation.XmlRootElement;
-import jakarta.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
-import javafx.beans.property.ObjectProperty;
-import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.BooleanProperty;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import space.sadfox.owlook.base.jaxb.ChangeHistory;
@@ -23,7 +21,7 @@ public class OwlHead implements ChangeHistoryKeeping {
   private HollowOwl hollowOwl;
 
   private final StringProperty title = new SimpleStringProperty("");
-  private final ObjectProperty<UUID> parentOwl = new SimpleObjectProperty<>();
+  private final BooleanProperty hidden = new SimpleBooleanProperty();
 
   public OwlHead() {
     changeHistory = new ChangeHistory<>(this);
@@ -42,18 +40,17 @@ public class OwlHead implements ChangeHistoryKeeping {
     return title;
   }
 
-  public ObjectProperty<UUID> parentOwlProperty() {
-    return parentOwl;
+  public BooleanProperty hiddenProperty() {
+    return hidden;
   }
 
   @XmlElement
-  @XmlJavaTypeAdapter(UUIDXmlAdapter.class)
-  public UUID getParentOwl() {
-    return parentOwl.get();
+  public Boolean isHidden() {
+    return hidden.get();
   }
 
-  public void setParentOwl(UUID parentOwl) {
-    this.parentOwl.set(parentOwl);
+  public void setHidden(Boolean hidden) {
+    this.hidden.set(hidden);
   }
 
   public ChangeHistory<OwlHead> getChangeHistory() {
