@@ -3,7 +3,6 @@ package space.sadfox.owlook.base.jaxb;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Stack;
-
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.Property;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -17,345 +16,344 @@ import space.sadfox.owlook.base.jaxb.ChangeHistoryListener.Change;
 
 public class ChangeHistory<E extends ChangeHistoryKeeping> {
 
-	private final E parent;
-	private final Stack<Changer> back = new Stack<>();
-	private final Stack<Changer> forward = new Stack<>();
-	private final BooleanProperty dontlisen = new SimpleBooleanProperty(false);
-	
-	private final List<ChangeHistoryListener<E>> listeners = new ArrayList<>();
-	
-	public ChangeHistory(E parent) {
-		this.parent = parent;
-		register(parent);
-	}
+  private final E parent;
+  private final Stack<Changer> back = new Stack<>();
+  private final Stack<Changer> forward = new Stack<>();
+  private final BooleanProperty dontlisen = new SimpleBooleanProperty(false);
 
-	private <T> void register(Property<T> property) {
+  private final List<ChangeHistoryListener<E>> listeners = new ArrayList<>();
 
-		checkAndRegister(property.getValue());
-		property.addListener((property2, oldValue, newValue) -> {
-			if (dontlisen.get())
-				return;
-			back.push(new Changer() {
+  public ChangeHistory(E parent) {
+    this.parent = parent;
+    register(parent);
+  }
 
-				@Override
-				public void undo() {
-					property.setValue(oldValue);
+  private <T> void register(Property<T> property) {
 
-				}
+    checkAndRegister(property.getValue());
+    property.addListener((property2, oldValue, newValue) -> {
+      if (dontlisen.get())
+        return;
+      back.push(new Changer() {
 
-				@Override
-				public void todo() {
-					property.setValue(newValue);
+        @Override
+        public void undo() {
+          property.setValue(oldValue);
 
-				}
-			});
-			forward.clear();
-			notifyWasModify();
+        }
 
-		});
-	}
+        @Override
+        public void todo() {
+          property.setValue(newValue);
 
-	private <T> void register(ObservableList<T> observableList) {
+        }
+      });
+      forward.clear();
+      notifyWasModify();
 
-		observableList.forEach(this::checkAndRegister);
+    });
+  }
 
-		observableList.addListener((ListChangeListener<Object>) change -> {
-			while (change.next()) {
-				if (change.wasAdded()) {
-					change.getAddedSubList().forEach(this::checkAndRegister);
-				}
-			}
-		});
-		observableList.addListener((ListChangeListener<T>) change -> {
-			if (dontlisen.get())
-				return;
-			while (change.next()) {
-				if (change.wasAdded()) {
-					change.getAddedSubList().forEach(element -> {
-						back.push(new Changer() {
+  private <T> void register(ObservableList<T> observableList) {
 
-							@Override
-							public void undo() {
-								observableList.remove(element);
-							}
+    observableList.forEach(this::checkAndRegister);
 
-							@Override
-							public void todo() {
-								int ind = observableList.indexOf(element);
-								observableList.add(ind, element);
-							}
-						});
-					});
-				}
-				if (change.wasRemoved()) {
-					change.getRemoved().forEach(element -> {
-						back.push(new Changer() {
+    observableList.addListener((ListChangeListener<Object>) change -> {
+      while (change.next()) {
+        if (change.wasAdded()) {
+          change.getAddedSubList().forEach(this::checkAndRegister);
+        }
+      }
+    });
+    observableList.addListener((ListChangeListener<T>) change -> {
+      if (dontlisen.get())
+        return;
+      while (change.next()) {
+        if (change.wasAdded()) {
+          change.getAddedSubList().forEach(element -> {
+            back.push(new Changer() {
 
-							@Override
-							public void undo() {
-								int ind = observableList.indexOf(element);
-								observableList.add(ind, element);
-							}
+              @Override
+              public void undo() {
+                observableList.remove(element);
+              }
 
-							@Override
-							public void todo() {
-								observableList.remove(element);
-							}
-						});
-					});
-				}
-			}
-			forward.clear();
-			notifyWasModify();
-		});
-	}
+              @Override
+              public void todo() {
+                int ind = observableList.indexOf(element);
+                observableList.add(ind, element);
+              }
+            });
+          });
+        }
+        if (change.wasRemoved()) {
+          change.getRemoved().forEach(element -> {
+            back.push(new Changer() {
 
-	private <K, V> void register(ObservableMap<K, V> observableMap) {
+              @Override
+              public void undo() {
+                int ind = observableList.indexOf(element);
+                observableList.add(ind, element);
+              }
 
-		observableMap.forEach((k, v) -> {
-			checkAndRegister(k);
-			checkAndRegister(v);
-		});
+              @Override
+              public void todo() {
+                observableList.remove(element);
+              }
+            });
+          });
+        }
+      }
+      forward.clear();
+      notifyWasModify();
+    });
+  }
 
-		observableMap.addListener((MapChangeListener<Object, Object>) change -> {
-			if (change.wasAdded()) {
-				checkAndRegister(change.getKey());
-				checkAndRegister(change.getValueAdded());
-			}
-		});
+  private <K, V> void register(ObservableMap<K, V> observableMap) {
+    observableMap.forEach((k, v) -> {
+      checkAndRegister(k);
+      checkAndRegister(v);
+    });
 
-		observableMap.addListener((MapChangeListener<K, V>) change -> {
-			if (change.wasAdded()) {
-				back.push(new Changer() {
+    observableMap.addListener((MapChangeListener<Object, Object>) change -> {
+      if (change.wasAdded()) {
+        checkAndRegister(change.getKey());
+        checkAndRegister(change.getValueAdded());
+      }
+    });
 
-					@Override
-					public void undo() {
-						observableMap.remove(change.getKey(), change.getValueAdded());
+    observableMap.addListener((MapChangeListener<K, V>) change -> {
+      if (change.wasAdded()) {
+        back.push(new Changer() {
 
-					}
+          @Override
+          public void undo() {
+            observableMap.remove(change.getKey(), change.getValueAdded());
 
-					@Override
-					public void todo() {
-						observableMap.put(change.getKey(), change.getValueAdded());
+          }
 
-					}
-				});
-			}
-			if (change.wasRemoved()) {
-				back.push(new Changer() {
+          @Override
+          public void todo() {
+            observableMap.put(change.getKey(), change.getValueAdded());
 
-					@Override
-					public void undo() {
-						observableMap.put(change.getKey(), change.getValueRemoved());
+          }
+        });
+      }
+      if (change.wasRemoved()) {
+        back.push(new Changer() {
 
-					}
+          @Override
+          public void undo() {
+            observableMap.put(change.getKey(), change.getValueRemoved());
 
-					@Override
-					public void todo() {
-						observableMap.remove(change.getKey(), change.getValueRemoved());
+          }
 
-					}
-				});
-			}
-			forward.clear();
-			notifyWasModify();
-		});
-	}
+          @Override
+          public void todo() {
+            observableMap.remove(change.getKey(), change.getValueRemoved());
 
-	private <T> void register(ObservableSet<T> observableSet) {
+          }
+        });
+      }
+      forward.clear();
+      notifyWasModify();
+    });
+  }
 
-		observableSet.forEach(this::checkAndRegister);
-		observableSet.addListener((SetChangeListener<Object>) change -> {
-			if (change.wasAdded()) {
-				checkAndRegister(change.getElementAdded());
-			}
-		});
+  private <T> void register(ObservableSet<T> observableSet) {
 
-		observableSet.addListener((SetChangeListener<T>) change -> {
-			if (change.wasAdded()) {
-				back.push(new Changer() {
+    observableSet.forEach(this::checkAndRegister);
+    observableSet.addListener((SetChangeListener<Object>) change -> {
+      if (change.wasAdded()) {
+        checkAndRegister(change.getElementAdded());
+      }
+    });
 
-					@Override
-					public void undo() {
-						observableSet.remove(change.getElementAdded());
+    observableSet.addListener((SetChangeListener<T>) change -> {
+      if (change.wasAdded()) {
+        back.push(new Changer() {
 
-					}
+          @Override
+          public void undo() {
+            observableSet.remove(change.getElementAdded());
 
-					@Override
-					public void todo() {
-						observableSet.add(change.getElementAdded());
+          }
 
-					}
-				});
-			}
-			if (change.wasRemoved()) {
-				back.push(new Changer() {
+          @Override
+          public void todo() {
+            observableSet.add(change.getElementAdded());
 
-					@Override
-					public void undo() {
-						observableSet.add(change.getElementRemoved());
+          }
+        });
+      }
+      if (change.wasRemoved()) {
+        back.push(new Changer() {
 
-					}
+          @Override
+          public void undo() {
+            observableSet.add(change.getElementRemoved());
 
-					@Override
-					public void todo() {
-						observableSet.remove(change.getElementRemoved());
+          }
 
-					}
-				});
-			}
-			forward.clear();
-			notifyWasModify();
-		});
-	}
+          @Override
+          public void todo() {
+            observableSet.remove(change.getElementRemoved());
 
-	private void register(ChangeHistoryKeeping entity) {
-		if (entity.getProperties() != null) {
-			entity.getProperties().forEach(this::checkAndRegister);
-		}
-	}
+          }
+        });
+      }
+      forward.clear();
+      notifyWasModify();
+    });
+  }
 
-	private void checkAndRegister(Object o) {
-		if (o instanceof ChangeHistoryKeeping) {
-			register((ChangeHistoryKeeping) o);
-		} else if (o instanceof Property<?>) {
-			register((Property<?>) o);
-		} else if (o instanceof ObservableList<?>) {
-			register((ObservableList<?>) o);
-		} else if (o instanceof ObservableMap<?, ?>) {
-			register((ObservableMap<?, ?>) o);
-		} else if (o instanceof ObservableSet<?>) {
-			register((ObservableSet<?>) o);
-		}
-	}
+  private void register(ChangeHistoryKeeping entity) {
+    if (entity.getProperties() != null) {
+      entity.getProperties().forEach(this::checkAndRegister);
+    }
+  }
 
-	public void back() {
-		if (back.size() == 0)
-			return;
-		Changer changer = back.pop();
-		dontlisen.set(true);
-		changer.undo();
-		dontlisen.set(false);
-		forward.push(changer);
-		notifyListeners(new Change<E>() {
+  private void checkAndRegister(Object o) {
+    if (o instanceof ChangeHistoryKeeping) {
+      register((ChangeHistoryKeeping) o);
+    } else if (o instanceof Property<?>) {
+      register((Property<?>) o);
+    } else if (o instanceof ObservableList<?>) {
+      register((ObservableList<?>) o);
+    } else if (o instanceof ObservableMap<?, ?>) {
+      register((ObservableMap<?, ?>) o);
+    } else if (o instanceof ObservableSet<?>) {
+      register((ObservableSet<?>) o);
+    }
+  }
 
-			@Override
-			public boolean wasModify() {
-				return false;
-			}
+  public void back() {
+    if (back.size() == 0)
+      return;
+    Changer changer = back.pop();
+    dontlisen.set(true);
+    changer.undo();
+    dontlisen.set(false);
+    forward.push(changer);
+    notifyListeners(new Change<E>() {
 
-			@Override
-			public boolean wasUndo() {
-				return true;
-			}
+      @Override
+      public boolean wasModify() {
+        return false;
+      }
 
-			@Override
-			public boolean wasRedo() {
-				return false;
-			}
+      @Override
+      public boolean wasUndo() {
+        return true;
+      }
 
-			@Override
-			public E getParent() {
-				return parent;
-			}
+      @Override
+      public boolean wasRedo() {
+        return false;
+      }
 
-		} );
-	}
+      @Override
+      public E getParent() {
+        return parent;
+      }
 
-	public void allBack() {
-		for (int i = 0; i < getBackSize(); i++) {
-			back();
-		}
-	}
+    });
+  }
 
-	public int getBackSize() {
-		return back.size();
-	}
+  public void allBack() {
+    for (int i = 0; i < getBackSize(); i++) {
+      back();
+    }
+  }
 
-	public void forward() {
-		if (forward.size() == 0)
-			return;
-		Changer changer = forward.pop();
-		dontlisen.set(true);
-		changer.todo();
-		dontlisen.set(false);
-		back.push(changer);
-		notifyListeners(new Change<E>() {
+  public int getBackSize() {
+    return back.size();
+  }
 
-			@Override
-			public boolean wasModify() {
-				return false;
-			}
+  public void forward() {
+    if (forward.size() == 0)
+      return;
+    Changer changer = forward.pop();
+    dontlisen.set(true);
+    changer.todo();
+    dontlisen.set(false);
+    back.push(changer);
+    notifyListeners(new Change<E>() {
 
-			@Override
-			public boolean wasUndo() {
-				return false;
-			}
+      @Override
+      public boolean wasModify() {
+        return false;
+      }
 
-			@Override
-			public boolean wasRedo() {
-				return true;
-			}
+      @Override
+      public boolean wasUndo() {
+        return false;
+      }
 
-			@Override
-			public E getParent() {
-				return parent;
-			}
+      @Override
+      public boolean wasRedo() {
+        return true;
+      }
 
-		});
-	}
+      @Override
+      public E getParent() {
+        return parent;
+      }
 
-	public void allForward() {
-		for (int i = 0; i < getForwardSize(); i++) {
-			forward();
-		}
-	}
+    });
+  }
 
-	public int getForwardSize() {
-		return forward.size();
-	}
+  public void allForward() {
+    for (int i = 0; i < getForwardSize(); i++) {
+      forward();
+    }
+  }
 
-	public void forgetСhanges() {
-		back.clear();
-		forward.clear();
-	}
-	
-	public void addListener(ChangeHistoryListener<E> listener) {
-		listeners.add(listener);
-	}
-	
-	public void removeListener(ChangeHistoryListener<E> listener) {
-		listeners.remove(listener);
-	}
+  public int getForwardSize() {
+    return forward.size();
+  }
 
-	private void notifyListeners(ChangeHistoryListener.Change<E> change) {
-		listeners.forEach(listener -> listener.change(change));
-	}
-	
-	private void notifyWasModify() {
-		notifyListeners(new Change<E>() {
+  public void forgetСhanges() {
+    back.clear();
+    forward.clear();
+  }
 
-			@Override
-			public boolean wasModify() {
-				return true;
-			}
+  public void addListener(ChangeHistoryListener<E> listener) {
+    listeners.add(listener);
+  }
 
-			@Override
-			public boolean wasUndo() {
-				return false;
-			}
+  public void removeListener(ChangeHistoryListener<E> listener) {
+    listeners.remove(listener);
+  }
 
-			@Override
-			public boolean wasRedo() {
-				return false;
-			}
+  private void notifyListeners(ChangeHistoryListener.Change<E> change) {
+    listeners.forEach(listener -> listener.change(change));
+  }
 
-			@Override
-			public E getParent() {
-				return parent;
-			}
+  private void notifyWasModify() {
+    notifyListeners(new Change<E>() {
 
-		});
-	}
+      @Override
+      public boolean wasModify() {
+        return true;
+      }
+
+      @Override
+      public boolean wasUndo() {
+        return false;
+      }
+
+      @Override
+      public boolean wasRedo() {
+        return false;
+      }
+
+      @Override
+      public E getParent() {
+        return parent;
+      }
+
+    });
+  }
 
 }

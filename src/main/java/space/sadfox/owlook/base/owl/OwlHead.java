@@ -71,12 +71,13 @@ public class OwlHead implements ChangeHistoryKeeping {
   };
 
   public void syncWith(OwlHead owlHead) {
-    // TODO:
+    setTitle(owlHead.getTitle());
+    setHidden(owlHead.isHidden());
   }
 
   @Override
   public String toString() {
-    return "OwlHead [getTitle()=" + getTitle() + "]";
+    return "OwlHead{title=" + title.get() + ", hidden=" + hidden.get() + "}";
   }
 
 

@@ -54,9 +54,9 @@ class OwlFileSystem implements AutoCloseable {
           // TODO как-то обработать исключение
           e.printStackTrace();
         }
+      } else {
       }
     });
-
   }
 
   public boolean isOpened() {
