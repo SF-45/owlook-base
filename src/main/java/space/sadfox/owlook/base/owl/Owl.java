@@ -232,6 +232,14 @@ public final class Owl<T extends OwlEntity> implements HollowOwl {
     }
   }
 
+  public void syncWith(Owl<T> owl) {
+    if (!owl.entityClass().equals(entityClass())) {
+      return;
+    }
+    entity().syncWith(owl.entity());
+    head().syncWith(owl.head());
+  }
+
   @FunctionalInterface
   public interface SaveExceptionHandler {
     void handle(Exception exception);
