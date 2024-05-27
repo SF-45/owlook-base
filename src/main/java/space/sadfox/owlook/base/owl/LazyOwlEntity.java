@@ -65,6 +65,4 @@ public class LazyOwlEntity extends OwlEntity {
       properties.put(key, new SimpleStringProperty(value.get()));
     });
   }
-
-
 }
