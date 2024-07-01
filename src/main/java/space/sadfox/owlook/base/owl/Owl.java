@@ -160,27 +160,32 @@ public final class Owl<T extends OwlEntity> implements HollowOwl {
     return saveExceptionHandler != null;
   }
 
-  public static <T extends OwlEntity> Owl<T> create(Path directory, String name, Class<T> target)
-      throws IOException, JAXBException, ReflectiveOperationException,
+  public static <T extends OwlEntity> Owl<T> create(Path path, Class<T> target)
+      throws FileAlreadyExistsException, ReflectiveOperationException, IOException, JAXBException,
       OwlEntityInitializeException {
-    if (!Files.isDirectory(directory)) {
-      throw new IOException("Is not directory: " + directory);
-    }
     OwlInfo info = new OwlInfo();
+    String fileName = "";
+    Path directory;
+
+    if (Files.isDirectory(path)) {
+      fileName = info.id() + EXTENSION;
+      directory = path;
+    } else {
+      fileName =
+          path.endsWith(EXTENSION) ? path.getFileName().toString() : path.getFileName() + EXTENSION;
+      directory = path.getParent();
+    }
+
+    Path newOwlFile = directory.resolve(fileName);
+    if (Files.exists(newOwlFile)) {
+      throw new FileAlreadyExistsException(newOwlFile.toString());
+    }
+
     T entity = target.getConstructor().newInstance();
     info.createdModule = target.getModule().getName();
     info.createdTime = System.currentTimeMillis();
     info.targetClass = target.getName();
     info.owlName = entity.getEntityName();
-    if (name == null || name == "") {
-      name = info.id().toString();
-    }
-
-    Path newOwlFile = directory.resolve(name + EXTENSION);
-
-    if (Files.exists(newOwlFile)) {
-      throw new FileAlreadyExistsException(name + EXTENSION);
-    }
 
     try (ZipOutputStream zipOut = new ZipOutputStream(Files.newOutputStream(newOwlFile))) {
       zipOut.putNextEntry(new ZipEntry(INFO_DIR.get()));
@@ -204,12 +209,6 @@ public final class Owl<T extends OwlEntity> implements HollowOwl {
     return new Owl<>(newOwlFile, target);
   }
 
-  public static <T extends OwlEntity> Owl<T> create(Path directory, Class<T> target)
-      throws IOException, JAXBException, ReflectiveOperationException,
-      OwlEntityInitializeException {
-    return create(directory, null, target);
-  }
-
   public static HollowOwl getHollowOwl(Path owlFile) throws IOException, JAXBException {
     Owl<?> owl = null;
     try {
@@ -225,11 +224,10 @@ public final class Owl<T extends OwlEntity> implements HollowOwl {
   }
 
   private OwlFileSystem getOwlFileSystem() throws IOException {
-    if (fileSystem.isOpened()) {
-      return fileSystem;
-    } else {
-      return new OwlFileSystem(location);
+    if (fileSystem == null || !fileSystem.isOpened()) {
+      fileSystem = new OwlFileSystem(location);
     }
+    return fileSystem;
   }
 
   public void syncWith(Owl<T> owl) {
