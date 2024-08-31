@@ -15,7 +15,7 @@ public abstract class OwlEntity implements ChangeHistoryKeeping {
     return changeHistory;
   }
 
-  public final Owl<?> getOwl() {
+  public final Owl<?> thisOwl() {
     return owl;
   }
 
