@@ -79,8 +79,8 @@ public final class Owl<T extends OwlEntity> implements HollowOwl {
       if (target != null) {
         this.target = target;
         entity = JAXBHelper.unmarshalInstance(fileSystem.entityPath, target);
-        entity.initialize();
         entity.setOwl(this);
+        entity.initialize();
         entity.getChangeHistory().addListener(change -> autoSaveAction());
       }
     }

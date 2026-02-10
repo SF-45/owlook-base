@@ -47,11 +47,6 @@ public class LazyOwlEntity extends OwlEntity {
   }
 
   @Override
-  public List<Owl<?>> getChildrenOwls() throws OwlEntityHasNoContainingOwls {
-    throw new OwlEntityHasNoContainingOwls();
-  }
-
-  @Override
   protected void initialize() throws OwlEntityInitializeException {}
 
   @Override

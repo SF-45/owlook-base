@@ -26,8 +26,6 @@ public abstract class OwlEntity implements ChangeHistoryKeeping {
   @Override
   public abstract List<Object> getProperties();
 
-  public abstract List<Owl<?>> getChildrenOwls() throws OwlEntityHasNoContainingOwls;
-
   public String getEntityName() {
     return getClass().getSimpleName();
   }
