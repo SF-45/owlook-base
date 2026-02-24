@@ -13,6 +13,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 
@@ -29,7 +33,10 @@ class OwlFileSystem implements AutoCloseable {
   private final IntegerProperty openedCount = new SimpleIntegerProperty(1);
   private boolean closeRequest = false;
 
-  public OwlFileSystem(Path owlFile) throws FileNotFoundException, IOException {
+  private static final Logger log = LoggerFactory.getLogger(OwlFileSystem.class);
+
+  OwlFileSystem(final Path owlFile) throws FileNotFoundException, IOException {
+    log.debug("Open OwlFileSystem for: {}", owlFile);
     if (Files.notExists(owlFile)) {
       throw new FileNotFoundException(owlFile.toString());
     }
@@ -38,6 +45,7 @@ class OwlFileSystem implements AutoCloseable {
     Map<String, String> env = new HashMap<>();
     env.put("create", "true");
     URI uri = URI.create("jar:" + location.toUri());
+    log.debug("FileSystem URI: {}", uri);
     fileSystem = FileSystems.newFileSystem(uri, env);
 
     root = fileSystem.getPath("/");
@@ -50,9 +58,9 @@ class OwlFileSystem implements AutoCloseable {
       if (newValue.intValue() <= 0) {
         try {
           fileSystem.close();
+          log.debug("Closing OwlFileSystem for: {}", owlFile);
         } catch (IOException e) {
-          // TODO как-то обработать исключение
-          e.printStackTrace();
+          log.error("Error closing OwlFileSystem for: {}", owlFile, e);
         }
       } else {
       }
@@ -66,6 +74,7 @@ class OwlFileSystem implements AutoCloseable {
   public OwlResource openResource() {
     OwlResource res = new OwlResource(this);
     incrementOpened();
+    log.debug("Open OwlResource for: {}, total resources opened: {}", location, openedCount.get());
     res.openProperty().addListener((property, oldValue, newValue) -> {
       if (newValue) {
         incrementOpened();
@@ -88,6 +97,7 @@ class OwlFileSystem implements AutoCloseable {
   public void close() {
     if (!closeRequest) {
       decrementOpened();
+      log.debug("OwlFileSystem close request for: {}, total resources opened: {}", location, openedCount.get());
       closeRequest = true;
     }
   }
