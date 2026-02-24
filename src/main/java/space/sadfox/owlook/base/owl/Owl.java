@@ -12,6 +12,10 @@ import java.nio.file.Path;
 import java.util.Date;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import jakarta.xml.bind.JAXBException;
 import space.sadfox.owlook.base.jaxb.JAXBHelper;
 
@@ -21,6 +25,7 @@ public final class Owl<T extends OwlEntity> implements HollowOwl {
     private int duration = 0;
     private int counter = 1;
     public final Thread thread;
+    private static final Logger log = LoggerFactory.getLogger(Owl.AutoSaveTimer.class);
 
     AutoSaveTimer(int durationSec) {
       duration = durationSec;
@@ -35,7 +40,7 @@ public final class Owl<T extends OwlEntity> implements HollowOwl {
         try {
           Thread.sleep(1000);
         } catch (InterruptedException e) {
-          e.printStackTrace();
+          log.error("Timer thread sleep error", e);
         }
       }
       try {
@@ -50,6 +55,7 @@ public final class Owl<T extends OwlEntity> implements HollowOwl {
     }
   }
 
+  private static final Logger log = LoggerFactory.getLogger(Owl.class);
   public static final String EXTENSION = ".owl";
 
   private OwlFileSystem fileSystem;
@@ -67,21 +73,28 @@ public final class Owl<T extends OwlEntity> implements HollowOwl {
 
   public Owl(Path owlFile, Class<T> target)
       throws IOException, JAXBException, OwlEntityInitializeException {
+    log.info("Open Owl {}", owlFile);
     try (OwlFileSystem fileSystem = new OwlFileSystem(owlFile)) {
       location = fileSystem.location;
       this.fileSystem = fileSystem;
 
+      log.debug("Parse Owl.info");
       info = JAXBHelper.unmarshalInstance(fileSystem.infoPath, OwlInfo.class);
+      log.debug("Parse Owl.head");
       head = JAXBHelper.unmarshalInstance(fileSystem.headPath, OwlHead.class);
       head.setHollowOwl(this);
       head.getChangeHistory().addListener(change -> autoSaveAction());
 
       if (target != null) {
         this.target = target;
+        log.debug("Parse Owl.entity {}", target);
         entity = JAXBHelper.unmarshalInstance(fileSystem.entityPath, target);
         entity.setOwl(this);
         entity.initialize();
         entity.getChangeHistory().addListener(change -> autoSaveAction());
+        log.debug("Complete opening Owl {}", owlFile);
+      } else {
+        log.debug("Complete opening HollowOwl {}", owlFile);
       }
     }
   }
@@ -128,7 +141,7 @@ public final class Owl<T extends OwlEntity> implements HollowOwl {
 
   public synchronized void save() throws JAXBException, IOException {
     try (OwlFileSystem fs = getOwlFileSystem()) {
-      System.out.println(new Date(System.currentTimeMillis()));
+      log.debug("Save owl: ", this);
       JAXBHelper.marshalInstance(fs.entityPath, target, entity);
       JAXBHelper.marshalInstance(fs.headPath, OwlHead.class, head);
     }
@@ -163,30 +176,34 @@ public final class Owl<T extends OwlEntity> implements HollowOwl {
   public static <T extends OwlEntity> Owl<T> create(Path path, Class<T> target)
       throws FileAlreadyExistsException, ReflectiveOperationException, IOException, JAXBException,
       OwlEntityInitializeException {
+    log.info("Create new Owl: {} Target: {}", path, target);
     OwlInfo info = new OwlInfo();
     String fileName = "";
     Path directory;
 
     if (Files.isDirectory(path)) {
       fileName = info.id() + EXTENSION;
+      log.debug("File name not specified. Created with owl ID: ", fileName);
       directory = path;
     } else {
-      fileName =
-          path.endsWith(EXTENSION) ? path.getFileName().toString() : path.getFileName() + EXTENSION;
+      fileName = path.endsWith(EXTENSION) ? path.getFileName().toString() : path.getFileName() + EXTENSION;
       directory = path.getParent();
     }
 
     Path newOwlFile = directory.resolve(fileName);
     if (Files.exists(newOwlFile)) {
+      log.warn("Attempting to create a Owl with a filename that already exists: {}", newOwlFile);
       throw new FileAlreadyExistsException(newOwlFile.toString());
     }
 
+    log.debug("Create new OwlEntity from {}", target);
     T entity = target.getConstructor().newInstance();
     info.createdModule = target.getModule().getName();
     info.createdTime = System.currentTimeMillis();
     info.targetClass = target.getName();
     info.owlName = entity.getEntityName();
 
+    log.debug("Open OutputStream from {}", newOwlFile);
     try (ZipOutputStream zipOut = new ZipOutputStream(Files.newOutputStream(newOwlFile))) {
       zipOut.putNextEntry(new ZipEntry(INFO_DIR.get()));
 
@@ -205,6 +222,7 @@ public final class Owl<T extends OwlEntity> implements HollowOwl {
       Files.deleteIfExists(newOwlFile);
       throw e;
     }
+    log.debug("Complete create Owl: {} Target: {}", newOwlFile, target);
 
     return new Owl<>(newOwlFile, target);
   }
@@ -232,6 +250,7 @@ public final class Owl<T extends OwlEntity> implements HollowOwl {
 
   public void syncWith(Owl<T> owl) {
     if (!owl.entityClass().equals(entityClass())) {
+      log.warn("Attempt to synchronize incompatible Owls {} with {}", this.entityClass(), owl.entityClass());
       return;
     }
     entity().syncWith(owl.entity());
@@ -242,6 +261,5 @@ public final class Owl<T extends OwlEntity> implements HollowOwl {
   public interface SaveExceptionHandler {
     void handle(Exception exception);
   }
-
 
 }
