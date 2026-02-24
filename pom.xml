@@ -3,22 +3,33 @@
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>space.sadfox</groupId>
-  <artifactId>owlook.base</artifactId>
-  <version>0.7.3-beta</version>
+  <artifactId>owlook-base</artifactId>
+  <version>1.0.0</version>
   <name>Owlook Base</name>
   <description>Base library for Owlook</description>
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <java.source>11</java.source>
-    <java.target>11</java.target>
-    <javafx.version>19</javafx.version>
+    <java.source>17</java.source>
+    <java.target>17</java.target>
   </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>space.sadfox</groupId>
+        <artifactId>owlook-bom</artifactId>
+        <version>1.0.0</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <dependencies>
     <dependency>
       <groupId>jakarta.xml.bind</groupId>
       <artifactId>jakarta.xml.bind-api</artifactId>
-      <version>4.0.0</version>
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.glassfish.jaxb</groupId>
@@ -28,7 +39,15 @@
     <dependency>
       <groupId>org.openjfx</groupId>
       <artifactId>javafx-base</artifactId>
-      <version>${javafx.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 
@@ -39,9 +58,32 @@
         <artifactId>maven-compiler-plugin</artifactId>
         <version>3.11.0</version>
         <configuration>
-        <source>${java.source}</source>
-        <target>${java.target}</target>
+          <source>${java.source}</source>
+          <target>${java.target}</target>
         </configuration>
+      </plugin>
+      <plugin>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.5.4</version>
+      </plugin>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>0.8.14</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>report</id>
+            <phase>test</phase>
+            <goals>
+              <goal>report</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>
