@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import jakarta.xml.bind.annotation.XmlAccessType;
 import jakarta.xml.bind.annotation.XmlAccessorType;
+import jakarta.xml.bind.annotation.XmlRootElement;
 import jakarta.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
@@ -12,6 +13,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableMap;
 
 @XmlAccessorType(XmlAccessType.NONE)
+@XmlRootElement
 public class LazyOwlEntity extends OwlEntity {
 
   private ObservableMap<String, StringProperty> properties = FXCollections.observableHashMap();
@@ -47,7 +49,8 @@ public class LazyOwlEntity extends OwlEntity {
   }
 
   @Override
-  protected void initialize() throws OwlEntityInitializeException {}
+  protected void initialize() throws OwlEntityInitializeException {
+  }
 
   @Override
   public void syncWith(OwlEntity entity) {
