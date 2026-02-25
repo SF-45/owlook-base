@@ -186,7 +186,8 @@ public final class Owl<T extends OwlEntity> implements HollowOwl {
       log.debug("File name not specified. Created with owl ID: ", fileName);
       directory = path;
     } else {
-      fileName = path.endsWith(EXTENSION) ? path.getFileName().toString() : path.getFileName() + EXTENSION;
+      fileName = path.getFileName().toString();
+      fileName = fileName.endsWith(EXTENSION) ? fileName : fileName + EXTENSION;
       directory = path.getParent();
     }
 
