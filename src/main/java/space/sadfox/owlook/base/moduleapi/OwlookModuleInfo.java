@@ -17,94 +17,93 @@ import jakarta.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 @XmlRootElement
 public class OwlookModuleInfo {
 
-	static class RequireOwlookModule {
+  static class RequireOwlookModule {
 
-		RequireOwlookModule(List<String> values) {
-			this.values = values;
-		}
-		RequireOwlookModule() {
-		}
+    RequireOwlookModule(List<String> values) {
+      this.values = values;
+    }
 
-		@XmlValue
-		List<String> values = new ArrayList<>();
+    RequireOwlookModule() {
+    }
 
-	}
+    @XmlValue
+    List<String> values = new ArrayList<>();
 
-	public static class RequireOwlookModuleAdapter extends XmlAdapter<RequireOwlookModule, List<String>> {
+  }
 
-		@Override
-		public List<String> unmarshal(RequireOwlookModule v) throws Exception {
-			return v.values;
-		}
+  static class RequireOwlookModuleAdapter extends XmlAdapter<RequireOwlookModule, List<String>> {
 
-		@Override
-		public RequireOwlookModule marshal(List<String> v) throws Exception {
-			return new RequireOwlookModule(v);
-		}
+    @Override
+    public List<String> unmarshal(RequireOwlookModule v) throws Exception {
+      return v.values;
+    }
 
-	}
+    @Override
+    public RequireOwlookModule marshal(List<String> v) throws Exception {
+      return new RequireOwlookModule(v);
+    }
 
-	@XmlElement
-	String name;
-	@XmlElement
-	String moduleName;
-	@XmlElement
-	String description;
-	@XmlElement
-	@XmlJavaTypeAdapter(VersionFormatAdapter.class)
-	VersionFormat version;
+  }
 
-	@XmlElement(name = "requiresOwlookModules")
-	@XmlJavaTypeAdapter(RequireOwlookModuleAdapter.class)
-	final List<String> requiresOwlookModules = new ArrayList<>();
+  @XmlElement
+  String name;
+  @XmlElement
+  String moduleName;
+  @XmlElement
+  String description;
+  @XmlElement
+  @XmlJavaTypeAdapter(VersionFormatAdapter.class)
+  VersionFormat version;
 
-	OwlookModuleInfo() {
+  @XmlElement(name = "requiresOwlookModules")
+  @XmlJavaTypeAdapter(RequireOwlookModuleAdapter.class)
+  final List<String> requiresOwlookModules = new ArrayList<>();
 
-	}
+  OwlookModuleInfo() {
 
-	public OwlookModuleInfo(String name, String description, VersionFormat version, String ... requiresOwlookModules) {
-		this.name = name;
-		this.description = description;
-		this.version = version;
-		this.requiresOwlookModules.addAll(Arrays.asList(requiresOwlookModules));
-	}
+  }
 
-	public String name() {
-		return name;
-	}
+  public OwlookModuleInfo(String name, String description, VersionFormat version, String... requiresOwlookModules) {
+    this.name = name;
+    this.description = description;
+    this.version = version;
+    this.requiresOwlookModules.addAll(Arrays.asList(requiresOwlookModules));
+  }
 
-	public String description() {
-		return description;
-	}
+  public String name() {
+    return name;
+  }
 
-	public VersionFormat version() {
-		return version;
-	}
+  public String description() {
+    return description;
+  }
 
-	public String moduleName() {
-		return moduleName;
-	}
+  public VersionFormat version() {
+    return version;
+  }
 
-	public List<String> requiresOwlookModules() {
-		return Collections.unmodifiableList(requiresOwlookModules);
-	}
+  public String moduleName() {
+    return moduleName;
+  }
 
-	@Override
-	public String toString() {
-		StringBuilder builder = new StringBuilder("OwlookModuleInfo\n");
-		builder.append("Name = " + name + "\n");
-		builder.append("Module Name = " + moduleName + "\n");
-		builder.append("Description = " + description + "\n");
-		builder.append("Version = " + version + "\n");
-		if (requiresOwlookModules.size() > 0) {
-			builder.append("Requires Owlook Modules:\n");
-			for (String requireModule : requiresOwlookModules) {
-				builder.append("\t- " + requireModule + "\n");
-			}
-		}
-		return builder.toString();
-	}
-	
-	
+  public List<String> requiresOwlookModules() {
+    return Collections.unmodifiableList(requiresOwlookModules);
+  }
+
+  @Override
+  public String toString() {
+    StringBuilder builder = new StringBuilder("OwlookModuleInfo\n");
+    builder.append("Name = " + name + "\n");
+    builder.append("Module Name = " + moduleName + "\n");
+    builder.append("Description = " + description + "\n");
+    builder.append("Version = " + version + "\n");
+    if (requiresOwlookModules.size() > 0) {
+      builder.append("Requires Owlook Modules:\n");
+      for (String requireModule : requiresOwlookModules) {
+        builder.append("\t- " + requireModule + "\n");
+      }
+    }
+    return builder.toString();
+  }
 
 }
