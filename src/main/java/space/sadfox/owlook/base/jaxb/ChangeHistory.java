@@ -70,37 +70,36 @@ public class ChangeHistory<E extends ChangeHistoryKeeping> {
         return;
       while (change.next()) {
         if (change.wasAdded()) {
-          change.getAddedSubList().forEach(element -> {
-            back.push(new Changer() {
+          final int from = change.getFrom();
+          final var addedSubList = new ArrayList<>(change.getAddedSubList());
+          back.push(new Changer() {
 
-              @Override
-              public void undo() {
-                observableList.remove(element);
-              }
+            @Override
+            public void undo() {
+              observableList.removeAll(addedSubList);
+            }
 
-              @Override
-              public void todo() {
-                int ind = observableList.indexOf(element);
-                observableList.add(ind, element);
-              }
-            });
+            @Override
+            public void todo() {
+              observableList.addAll(from, addedSubList);
+            }
           });
         }
         if (change.wasRemoved()) {
-          change.getRemoved().forEach(element -> {
-            back.push(new Changer() {
+          final int from = change.getFrom();
+          final var removed = new ArrayList<>(change.getRemoved());
+          back.push(new Changer() {
 
-              @Override
-              public void undo() {
-                int ind = observableList.indexOf(element);
-                observableList.add(ind, element);
-              }
+            @Override
+            public void undo() {
+              observableList.addAll(from, removed);
+            }
 
-              @Override
-              public void todo() {
-                observableList.remove(element);
-              }
-            });
+            @Override
+            public void todo() {
+              observableList.removeAll(removed);
+            }
+
           });
         }
       }
@@ -261,7 +260,8 @@ public class ChangeHistory<E extends ChangeHistoryKeeping> {
   }
 
   public void allBack() {
-    for (int i = 0; i < getBackSize(); i++) {
+    final int backSize = getBackSize();
+    for (int i = 0; i < backSize; i++) {
       back();
     }
   }
@@ -304,7 +304,8 @@ public class ChangeHistory<E extends ChangeHistoryKeeping> {
   }
 
   public void allForward() {
-    for (int i = 0; i < getForwardSize(); i++) {
+    final int forwardSize = getForwardSize();
+    for (int i = 0; i < forwardSize; i++) {
       forward();
     }
   }
