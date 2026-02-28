@@ -1,11 +1,15 @@
 package space.sadfox.owlook.base.jaxb;
 
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Stack;
+
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.Property;
 import javafx.beans.property.SimpleBooleanProperty;
+import javafx.beans.value.ChangeListener;
 import javafx.collections.ListChangeListener;
 import javafx.collections.MapChangeListener;
 import javafx.collections.ObservableList;
@@ -21,6 +25,8 @@ public class ChangeHistory<E extends ChangeHistoryKeeping> {
   private final Stack<Changer> forward = new Stack<>();
   private final BooleanProperty dontlisen = new SimpleBooleanProperty(false);
 
+  private final Map<Object, Runnable> unsubscribeActions = new IdentityHashMap<>();
+
   private final List<ChangeHistoryListener<E>> listeners = new ArrayList<>();
 
   public ChangeHistory(E parent) {
@@ -31,7 +37,9 @@ public class ChangeHistory<E extends ChangeHistoryKeeping> {
   private <T> void register(Property<T> property) {
 
     checkAndRegister(property.getValue());
-    property.addListener((property2, oldValue, newValue) -> {
+    final ChangeListener<T> chListener = (observable, oldValue, newValue) -> {
+      checkAndRegister(newValue);
+      unsubscribeProperty(oldValue);
       if (dontlisen.get())
         return;
       back.push(new Changer() {
@@ -51,24 +59,26 @@ public class ChangeHistory<E extends ChangeHistoryKeeping> {
       forward.clear();
       notifyWasModify();
 
-    });
+    };
+    unsubscribeActions.put(property, () -> property.removeListener(chListener));
+    property.addListener(chListener);
   }
 
   private <T> void register(ObservableList<T> observableList) {
 
     observableList.forEach(this::checkAndRegister);
 
-    observableList.addListener((ListChangeListener<Object>) change -> {
+    final ListChangeListener<T> listChListener = change -> {
       while (change.next()) {
         if (change.wasAdded()) {
           change.getAddedSubList().forEach(this::checkAndRegister);
         }
-      }
-    });
-    observableList.addListener((ListChangeListener<T>) change -> {
-      if (dontlisen.get())
-        return;
-      while (change.next()) {
+        if (change.wasRemoved()) {
+          change.getRemoved().forEach(this::unsubscribeProperty);
+        }
+        if (dontlisen.get()) {
+          return;
+        }
         if (change.wasAdded()) {
           final int from = change.getFrom();
           final var addedSubList = new ArrayList<>(change.getAddedSubList());
@@ -99,13 +109,14 @@ public class ChangeHistory<E extends ChangeHistoryKeeping> {
             public void todo() {
               observableList.removeAll(removed);
             }
-
           });
         }
+        forward.clear();
+        notifyWasModify();
       }
-      forward.clear();
-      notifyWasModify();
-    });
+    };
+    unsubscribeActions.put(observableList, () -> observableList.removeListener(listChListener));
+    observableList.addListener(listChListener);
   }
 
   private <K, V> void register(ObservableMap<K, V> observableMap) {
@@ -114,96 +125,129 @@ public class ChangeHistory<E extends ChangeHistoryKeeping> {
       checkAndRegister(v);
     });
 
-    observableMap.addListener((MapChangeListener<Object, Object>) change -> {
-      if (change.wasAdded()) {
+    final MapChangeListener<K, V> mapChListener = change -> {
+      if (change.wasAdded() && !change.wasRemoved()) {
         checkAndRegister(change.getKey());
         checkAndRegister(change.getValueAdded());
+      } else if (change.wasAdded() && change.wasRemoved()) {
+        unsubscribeProperty(change.getValueRemoved());
+      } else if (!change.wasAdded() && change.wasRemoved()) {
+        unsubscribeProperty(change.getKey());
+        unsubscribeProperty(change.getValueRemoved());
       }
-    });
 
-    observableMap.addListener((MapChangeListener<K, V>) change -> {
-      if (change.wasAdded()) {
+      if (dontlisen.get()) {
+        return;
+      }
+
+      if (change.wasAdded() && !change.wasRemoved()) {
+        final var key = change.getKey();
+        final var value = change.getValueAdded();
         back.push(new Changer() {
 
           @Override
           public void undo() {
-            observableMap.remove(change.getKey(), change.getValueAdded());
-
+            observableMap.remove(key);
           }
 
           @Override
           public void todo() {
-            observableMap.put(change.getKey(), change.getValueAdded());
-
+            observableMap.put(key, value);
           }
+
         });
-      }
-      if (change.wasRemoved()) {
+      } else if (change.wasAdded() && change.wasRemoved()) {
+        final var key = change.getKey();
+        final var newValue = change.getValueAdded();
+        final var oldValue = change.getValueRemoved();
         back.push(new Changer() {
 
           @Override
           public void undo() {
-            observableMap.put(change.getKey(), change.getValueRemoved());
-
+            observableMap.put(key, oldValue);
           }
 
           @Override
           public void todo() {
-            observableMap.remove(change.getKey(), change.getValueRemoved());
-
+            observableMap.put(key, newValue);
           }
+
+        });
+      } else if (!change.wasAdded() && change.wasRemoved()) {
+        final var key = change.getKey();
+        final var value = change.getValueRemoved();
+        back.push(new Changer() {
+
+          @Override
+          public void undo() {
+            observableMap.put(key, value);
+          }
+
+          @Override
+          public void todo() {
+            observableMap.remove(key);
+          }
+
         });
       }
       forward.clear();
       notifyWasModify();
-    });
+    };
+    unsubscribeActions.put(observableMap, () -> observableMap.removeListener(mapChListener));
+    observableMap.addListener(mapChListener);
   }
 
   private <T> void register(ObservableSet<T> observableSet) {
 
     observableSet.forEach(this::checkAndRegister);
-    observableSet.addListener((SetChangeListener<Object>) change -> {
+    final SetChangeListener<T> setChListener = change -> {
       if (change.wasAdded()) {
         checkAndRegister(change.getElementAdded());
+      } else if (change.wasRemoved()) {
+        unsubscribeProperty(change.getElementRemoved());
       }
-    });
 
-    observableSet.addListener((SetChangeListener<T>) change -> {
+      if (dontlisen.get()) {
+        return;
+      }
+
       if (change.wasAdded()) {
+        final var newValue = change.getElementAdded();
         back.push(new Changer() {
 
           @Override
           public void undo() {
-            observableSet.remove(change.getElementAdded());
-
+            observableSet.remove(newValue);
           }
 
           @Override
           public void todo() {
-            observableSet.add(change.getElementAdded());
-
+            observableSet.add(newValue);
           }
+
         });
-      }
-      if (change.wasRemoved()) {
+      } else if (change.wasRemoved()) {
+        final var oldValue = change.getElementRemoved();
         back.push(new Changer() {
 
           @Override
           public void undo() {
-            observableSet.add(change.getElementRemoved());
-
+            observableSet.add(oldValue);
           }
 
           @Override
           public void todo() {
-            observableSet.remove(change.getElementRemoved());
-
+            observableSet.remove(oldValue);
           }
+
         });
       }
+
       forward.clear();
       notifyWasModify();
-    });
+    };
+    unsubscribeActions.put(observableSet, () -> observableSet.removeListener(setChListener));
+    observableSet.addListener(setChListener);
   }
 
   private void register(ChangeHistoryKeeping entity) {
@@ -215,7 +259,11 @@ public class ChangeHistory<E extends ChangeHistoryKeeping> {
   private void checkAndRegister(Object o) {
     if (o instanceof ChangeHistoryKeeping) {
       register((ChangeHistoryKeeping) o);
-    } else if (o instanceof Property<?>) {
+    }
+    if (unsubscribeActions.containsKey(o)) {
+      return;
+    }
+    if (o instanceof Property<?>) {
       register((Property<?>) o);
     } else if (o instanceof ObservableList<?>) {
       register((ObservableList<?>) o);
@@ -223,6 +271,13 @@ public class ChangeHistory<E extends ChangeHistoryKeeping> {
       register((ObservableMap<?, ?>) o);
     } else if (o instanceof ObservableSet<?>) {
       register((ObservableSet<?>) o);
+    }
+  }
+
+  private void unsubscribeProperty(Object o) {
+    if (unsubscribeActions.containsKey(o)) {
+      unsubscribeActions.get(o).run();
+      unsubscribeActions.remove(o);
     }
   }
 
