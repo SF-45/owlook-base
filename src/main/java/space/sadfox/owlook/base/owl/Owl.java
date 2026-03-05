@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Date;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -17,44 +16,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import jakarta.xml.bind.JAXBException;
+import space.sadfox.owlook.base.jaxb.ActionTimer;
 import space.sadfox.owlook.base.jaxb.JAXBHelper;
 
 public final class Owl<T extends OwlEntity> implements HollowOwl {
-
-  private class AutoSaveTimer implements Runnable {
-    private int duration = 0;
-    private int counter = 1;
-    public final Thread thread;
-    private static final Logger log = LoggerFactory.getLogger(Owl.AutoSaveTimer.class);
-
-    AutoSaveTimer(int durationSec) {
-      duration = durationSec;
-      thread = new Thread(this);
-      thread.start();
-    }
-
-    @Override
-    public void run() {
-      while (counter < duration) {
-        counter++;
-        try {
-          Thread.sleep(1000);
-        } catch (InterruptedException e) {
-          log.error("Timer thread sleep error", e);
-        }
-      }
-      try {
-        save();
-      } catch (JAXBException | IOException e) {
-        saveExceptionHandler.handle(e);
-      }
-    }
-
-    public void resetTimer() {
-      counter = 1;
-    }
-  }
-
   private static final Logger log = LoggerFactory.getLogger(Owl.class);
   public static final String EXTENSION = ".owl";
 
@@ -68,12 +33,18 @@ public final class Owl<T extends OwlEntity> implements HollowOwl {
   private T entity;
 
   private SaveExceptionHandler saveExceptionHandler;
-  private int autoSaveDelay = 0;
-  private AutoSaveTimer autoSaveTimer;
+  private final ActionTimer autoSaveTimer;
 
   public Owl(Path owlFile, Class<T> target)
       throws IOException, JAXBException, OwlEntityInitializeException {
     log.info("Open Owl {}", owlFile);
+    autoSaveTimer = new ActionTimer(() -> {
+      try {
+        save();
+      } catch (Exception e) {
+        saveExceptionHandler.handle(e);
+      }
+    });
     try (OwlFileSystem fileSystem = new OwlFileSystem(owlFile)) {
       location = fileSystem.location;
       this.fileSystem = fileSystem;
@@ -141,7 +112,7 @@ public final class Owl<T extends OwlEntity> implements HollowOwl {
 
   public synchronized void save() throws JAXBException, IOException {
     try (OwlFileSystem fs = getOwlFileSystem()) {
-      log.debug("Save owl: ", this);
+      log.debug("Save owl: {}", this);
       JAXBHelper.marshalInstance(fs.entityPath, target, entity);
       JAXBHelper.marshalInstance(fs.headPath, OwlHead.class, head);
     }
@@ -149,16 +120,12 @@ public final class Owl<T extends OwlEntity> implements HollowOwl {
 
   private void autoSaveAction() {
     if (isEnableAutoSave()) {
-      if (autoSaveTimer == null || !autoSaveTimer.thread.isAlive()) {
-        autoSaveTimer = new AutoSaveTimer(autoSaveDelay);
-      } else {
-        autoSaveTimer.resetTimer();
-      }
+      autoSaveTimer.runOrResetTimer();
     }
   }
 
   public void setAutoSaveDelay(int sec) {
-    autoSaveDelay = sec;
+    autoSaveTimer.setDuration(sec);
   }
 
   public void enableAutoSave(SaveExceptionHandler handler) {
