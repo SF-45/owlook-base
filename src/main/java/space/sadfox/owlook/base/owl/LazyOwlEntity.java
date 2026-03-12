@@ -7,6 +7,8 @@ import jakarta.xml.bind.annotation.XmlAccessType;
 import jakarta.xml.bind.annotation.XmlAccessorType;
 import jakarta.xml.bind.annotation.XmlRootElement;
 import jakarta.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
@@ -17,6 +19,7 @@ import javafx.collections.ObservableMap;
 public class LazyOwlEntity extends OwlEntity {
 
   private ObservableMap<String, StringProperty> properties = FXCollections.observableHashMap();
+  private final ObservableMap<Object, ObjectProperty<Object>> cache = FXCollections.observableHashMap();
 
   public final HashMap<String, StringProperty> getLazyProperties() {
     return new HashMap<>(properties);
@@ -39,6 +42,30 @@ public class LazyOwlEntity extends OwlEntity {
 
   public final void clearLazyProperties() {
     properties.clear();
+  }
+
+  public final ObjectProperty<Object> getCachePropery(Object key) {
+    return cache.get(key);
+  }
+
+  public final Object getCacheValue(Object key) {
+    return isCached(key) ? getCachePropery(key).get() : null;
+  }
+
+  public final boolean isCached(Object key) {
+    return cache.containsKey(key);
+  }
+
+  public final ObjectProperty<?> setCacheValue(Object key, Object value) {
+    if (isCached(key)) {
+      final var cacheProperty = getCachePropery(key);
+      cacheProperty.set(value);
+      return cacheProperty;
+    } else {
+      final var cacheProperty = new SimpleObjectProperty<>(value);
+      cache.put(key, cacheProperty);
+      return cacheProperty;
+    }
   }
 
   @Override
