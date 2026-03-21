@@ -98,6 +98,7 @@ public final class Owl<T extends OwlEntity> implements HollowOwl {
     return location;
   }
 
+  @Override
   public String fileName() {
     String fileName = location.getFileName().toString();
     int ind = fileName.indexOf(EXTENSION);

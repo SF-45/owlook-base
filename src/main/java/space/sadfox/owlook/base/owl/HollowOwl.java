@@ -8,4 +8,6 @@ public interface HollowOwl {
   OwlHead head();
 
   Path location();
+
+  String fileName();
 }
